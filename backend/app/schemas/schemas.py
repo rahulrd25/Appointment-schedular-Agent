@@ -5,20 +5,23 @@ from pydantic import BaseModel, EmailStr
 
 
 class UserBase(BaseModel):
-    email: Optional[EmailStr] = None
+    email: EmailStr
+    full_name: str
 
 
 class UserCreate(UserBase):
-    email: EmailStr
-    password: str
+    password: str = ""
+    google_id: Optional[str] = None
 
 
 class UserInDBBase(UserBase):
-    id: Optional[uuid.UUID] = None
-    scheduling_slug: str
+    id: int
+    is_active: bool
+    is_verified: bool
+    google_id: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class User(UserInDBBase):
