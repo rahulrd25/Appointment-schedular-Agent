@@ -1,4 +1,6 @@
 import uuid
+import secrets
+import string
 
 from sqlalchemy.orm import Session
 
@@ -24,9 +26,36 @@ async def get_user_by_scheduling_slug(db: Session, scheduling_slug: str):
     )
 
 
+def generate_unique_scheduling_slug(db: Session, base_name: str = None) -> str:
+    """Generate a unique scheduling slug for a user."""
+    if base_name:
+        # Clean the base name for URL safety
+        clean_name = "".join(c for c in base_name.lower() if c.isalnum() or c == "-")
+        clean_name = clean_name[:20]  # Limit length
+    else:
+        clean_name = "user"
+    
+    # Try the clean name first
+    if not db.query(User).filter(User.scheduling_slug == clean_name).first():
+        return clean_name
+    
+    # If taken, add random suffix
+    for attempt in range(10):  # Try up to 10 times
+        suffix = ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(6))
+        slug = f"{clean_name}-{suffix}"
+        if not db.query(User).filter(User.scheduling_slug == slug).first():
+            return slug
+    
+    # If all else fails, use a completely random slug
+    return ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(12))
+
+
 def create_user(db: Session, user: UserCreate):
     hashed_password = get_password_hash(user.password) if user.password else None
     verification_token = str(uuid.uuid4()) if not user.google_id else None
+    
+    # Generate unique scheduling slug
+    scheduling_slug = generate_unique_scheduling_slug(db, user.full_name)
     
     db_user = User(
         email=user.email,
@@ -34,7 +63,8 @@ def create_user(db: Session, user: UserCreate):
         hashed_password=hashed_password,
         google_id=user.google_id,
         is_verified=bool(user.google_id),  # Google users are auto-verified
-        verification_token=verification_token
+        verification_token=verification_token,
+        scheduling_slug=scheduling_slug
     )
     db.add(db_user)
     db.commit()

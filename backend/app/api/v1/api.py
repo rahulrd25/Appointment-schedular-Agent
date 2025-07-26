@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import web_auth, web_pages, auth, calendar, public, users
+from app.api.v1.endpoints import web_auth, web_pages, auth, calendar, users, availability, bookings
 
 api_router = APIRouter()
 
@@ -11,5 +11,6 @@ api_router.include_router(web_pages.router, tags=["web_pages"])
 # API endpoints (with prefix)
 api_router.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 api_router.include_router(calendar.router, prefix="/api/v1", tags=["calendar"])
-api_router.include_router(public.router, prefix="/api/v1", tags=["public"])
 api_router.include_router(users.router, prefix="/api/v1", tags=["users"])
+api_router.include_router(availability.router, prefix="/api/v1/availability", tags=["availability"])
+api_router.include_router(bookings.router, prefix="/api/v1/bookings", tags=["bookings"])

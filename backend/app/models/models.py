@@ -1,7 +1,9 @@
 import uuid
+from datetime import datetime
 
-from sqlalchemy import Boolean, Column, Integer, String, DateTime
+from sqlalchemy import Boolean, Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 class User(Base):
@@ -17,5 +19,56 @@ class User(Base):
     google_id = Column(String, nullable=True)
     google_access_token = Column(String, nullable=True)
     google_refresh_token = Column(String, nullable=True)
+    google_calendar_connected = Column(Boolean, default=False)  # Track if calendar is connected
+    google_calendar_email = Column(String, nullable=True)  # Email of the Google account used for calendar
+    scheduling_slug = Column(String, unique=True, index=True)  # For shareable booking links
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    availability_slots = relationship("AvailabilitySlot", back_populates="user", cascade="all, delete-orphan")
+    bookings_as_host = relationship("Booking", foreign_keys="[Booking.host_user_id]", back_populates="host")
+
+
+class AvailabilitySlot(Base):
+    __tablename__ = "availability_slots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    start_time = Column(DateTime(timezone=True), nullable=False)
+    end_time = Column(DateTime(timezone=True), nullable=False)
+    is_available = Column(Boolean, default=True)  # Can be made unavailable without deletion
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="availability_slots")
+    bookings = relationship("Booking", back_populates="availability_slot")
+
+
+class Booking(Base):
+    __tablename__ = "bookings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    host_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    availability_slot_id = Column(Integer, ForeignKey("availability_slots.id"), nullable=False)
+    
+    # Guest information
+    guest_name = Column(String, nullable=False)
+    guest_email = Column(String, nullable=False)
+    guest_message = Column(String, nullable=True)  # Optional message from guest
+    
+    # Booking details
+    start_time = Column(DateTime(timezone=True), nullable=False)
+    end_time = Column(DateTime(timezone=True), nullable=False)
+    status = Column(String, default="confirmed")  # confirmed, cancelled, rescheduled
+    
+    # Google Calendar integration
+    google_event_id = Column(String, nullable=True)  # Store Google Calendar event ID
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    host = relationship("User", foreign_keys=[host_user_id], back_populates="bookings_as_host")
+    availability_slot = relationship("AvailabilitySlot", back_populates="bookings")
