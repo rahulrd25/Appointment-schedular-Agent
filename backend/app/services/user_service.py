@@ -11,7 +11,7 @@ async def get_user(db: Session, user_id: str):
     return db.query(User).filter(User.id == user_id).first()
 
 
-async def get_user_by_email(db: Session, email: str):
+def get_user_by_email(db: Session, email: str):
     return db.query(User).filter(User.email == email).first()
 
 
@@ -24,21 +24,17 @@ async def get_user_by_scheduling_slug(db: Session, scheduling_slug: str):
     )
 
 
-async def create_user(db: Session, user: UserCreate):
-    # Generate a simple slug from the email for now
-    scheduling_slug = user.email.split("@")[0] + "-" + str(uuid.uuid4())[:4]
-    
-    # Handle Google users (no password) vs regular users
-    if user.password:
-        hashed_password = get_password_hash(user.password)
-    else:
-        # For Google users, set a special hashed password that can't be used for login
-        hashed_password = get_password_hash("google_user_" + str(uuid.uuid4()))
+def create_user(db: Session, user: UserCreate):
+    hashed_password = get_password_hash(user.password) if user.password else None
+    verification_token = str(uuid.uuid4()) if not user.google_id else None
     
     db_user = User(
         email=user.email,
+        full_name=user.full_name,
         hashed_password=hashed_password,
-        scheduling_slug=scheduling_slug,
+        google_id=user.google_id,
+        is_verified=bool(user.google_id),  # Google users are auto-verified
+        verification_token=verification_token
     )
     db.add(db_user)
     db.commit()
@@ -46,10 +42,22 @@ async def create_user(db: Session, user: UserCreate):
     return db_user
 
 
-async def authenticate_user(db: Session, email: str, password: str):
-    user = await get_user_by_email(db, email)
+def authenticate_user(db: Session, email: str, password: str):
+    user = get_user_by_email(db, email)
     if not user:
-        return False
+        return None
+    if not user.is_verified:
+        return None  # Require email verification for standard users
     if not verify_password(password, user.hashed_password):
-        return False
+        return None
     return user
+
+
+def verify_user_email(db: Session, token: str):
+    user = db.query(User).filter(User.verification_token == token).first()
+    if user:
+        user.is_verified = True
+        user.verification_token = None
+        db.commit()
+        return user
+    return None

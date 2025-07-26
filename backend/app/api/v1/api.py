@@ -1,19 +1,15 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, calendar, public, users, web_auth, web_pages
+from app.api.v1.endpoints import web_auth, web_pages, auth, calendar, public, users
 
 api_router = APIRouter()
 
-# Web pages (no auth required)
+# Web pages (no prefix)
 api_router.include_router(web_pages.router, tags=["web_pages"])
+# Note: web_auth router should NOT include Google OAuth routes anymore
 
-# Web authentication (HTML forms, Google OAuth)
-api_router.include_router(web_auth.router, tags=["web_auth"])
-
-# API endpoints (JSON responses)
-api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
-api_router.include_router(users.router, prefix="/users", tags=["users"])
-api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
-
-# Public pages (some require auth)
-api_router.include_router(public.router, tags=["public"])
+# API endpoints (with prefix)
+api_router.include_router(auth.router, prefix="/api/v1", tags=["auth"])
+api_router.include_router(calendar.router, prefix="/api/v1", tags=["calendar"])
+api_router.include_router(public.router, prefix="/api/v1", tags=["public"])
+api_router.include_router(users.router, prefix="/api/v1", tags=["users"])
