@@ -1,21 +1,39 @@
 import os
+from pydantic_settings import BaseSettings
+from typing import Optional
 
 
-class Settings:
-    PROJECT_NAME: str = "Appointment Agent"
-    API_V1_STR: str = "/api/v1"
-
+class Settings(BaseSettings):
     # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://user:password@db:5432/appointment_agent_db")
+    DATABASE_URL: str
+    
+    # Security
+    SECRET_KEY: str
+    
+    # Google OAuth
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
+    
+    # App settings
+    PROJECT_NAME: str = "Appointment Agent"
+    APP_NAME: str = "Appointment Agent"
+    API_V1_STR: str = "/api/v1"
+    DEBUG: bool = False
+    
+    # Email settings
+    SMTP_SERVER: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    FRONTEND_URL: str = "http://localhost:8000"
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = False
 
-    # JWT
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "supersecretkey")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30  # 30 minutes
-
-    # Google Calendar API
-    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID")
-    GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET")
-    GOOGLE_REDIRECT_URI: str = os.getenv("GOOGLE_REDIRECT_URI")
-
-
+# Create settings instance
 settings = Settings()
+
+# Debug: Print loaded values (remove this after testing)
+print(f"Loaded GOOGLE_REDIRECT_URI: {settings.GOOGLE_REDIRECT_URI}")

@@ -1,23 +1,21 @@
 import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, String
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Boolean, Column, Integer, String, DateTime
 from sqlalchemy.sql import func
-
-Base = declarative_base()
-
+from app.core.database import Base
 
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True)
+    full_name = Column(String)
+    hashed_password = Column(String, nullable=True)  # Nullable for Google users
     is_active = Column(Boolean, default=True)
-    is_superuser = Column(Boolean, default=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    scheduling_slug = Column(String, unique=True, index=True, nullable=False)
+    is_verified = Column(Boolean, default=False)  # Email verification status
+    verification_token = Column(String, nullable=True)  # For email verification
+    google_id = Column(String, nullable=True)
     google_access_token = Column(String, nullable=True)
     google_refresh_token = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
