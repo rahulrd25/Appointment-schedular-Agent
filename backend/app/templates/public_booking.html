@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Book with {{ user.email }}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-4">
+    <h1 class="text-4xl font-bold mb-6 text-indigo-400">Book an Appointment with {{ user.email }}</h1>
+    <p class="text-lg text-gray-300 mb-8">Please select an available slot:</p>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-4xl">
+        {% if availability_slots %}
+            {% for slot in availability_slots %}
+                <div class="bg-gray-800 p-4 rounded-lg shadow-md flex flex-col justify-between">
+                    <div>
+                        <p class="text-xl font-semibold text-white">{{ slot.start_time.strftime('%Y-%m-%d') }}</p>
+                        <p class="text-lg text-gray-300">{{ slot.start_time.strftime('%H:%M') }} - {{ slot.end_time.strftime('%H:%M') }}</p>
+                    </div>
+                    <button
+                        hx-post="/api/v1/book-slot/{{ slot.id }}"
+                        hx-target="#booking-status"
+                        hx-swap="innerHTML"
+                        class="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300"
+                    >
+                        Book This Slot
+                    </button>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-gray-400 col-span-full text-center">No availability slots found for {{ user.email }}.</p>
+        {% endif %}
+    </div>
+
+    <div id="booking-status" class="mt-8 text-center text-lg font-semibold"></div>
+</div>
+{% endblock %}

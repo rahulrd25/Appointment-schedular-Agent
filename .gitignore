@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environments
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+thumbs.db
+
+# FastAPI/Uvicorn
+*.log
+*.sqlite3
+sql_app.db
+
+# Environment variables
+.env
+.env.*
+
+# Node.js (if any future frontend)
+node_modules/
+dist/
+build/
+
+# uv cache
+.uv/

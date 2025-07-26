@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+python-dotenv
+httpx
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+python-jose[cryptography]
+passlib[bcrypt]
+sendgrid
+jinja2
+psycopg2-binary

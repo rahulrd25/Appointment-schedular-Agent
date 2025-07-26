@@ -1,0 +1,31 @@
+[project]
+name = "app"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Your Name", email = "you@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.111.0",
+    "uvicorn>=0.30.1",
+    "sqlalchemy>=2.0.30",
+    "psycopg2-binary>=2.9.9",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "python-multipart>=0.0.9",
+    "jinja2>=3.1.4",
+    "httpx>=0.27.0",
+    "pytest>=8.2.2",
+    "python-dotenv>=1.0.1",
+    "google-api-python-client>=2.127.0",
+    "google-auth-httplib2>=0.2.0",
+    "google-auth-oauthlib",
+    "email-validator",
+    "requests",
+]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
