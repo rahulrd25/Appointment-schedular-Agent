@@ -1,4 +1,6 @@
 import os
+from datetime import datetime, timedelta, timezone
+from typing import Optional, Dict, Any
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -42,7 +44,8 @@ class GoogleCalendarService:
             "refresh_token": self.credentials.refresh_token,
         }
 
-    def get_events(self):
+    def _ensure_valid_credentials(self):
+        """Ensure credentials are valid and refresh if needed."""
         if not self.credentials:
             raise Exception("Google credentials not set.")
 
@@ -52,7 +55,231 @@ class GoogleCalendarService:
             else:
                 raise Exception("Google credentials expired and no refresh token available.")
 
+    def get_events(self, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None):
+        """Get events from the calendar, optionally filtered by date range."""
+        self._ensure_valid_credentials()
         service = build('calendar', 'v3', credentials=self.credentials)
-        events_result = service.events().list(calendarId='primary', maxResults=10).execute()
+        
+        # Set default date range if not provided
+        if not start_date:
+            start_date = datetime.now()
+        if not end_date:
+            end_date = start_date.replace(hour=23, minute=59, second=59)
+        
+        events_result = service.events().list(
+            calendarId='primary',
+            timeMin=start_date.isoformat() + 'Z',
+            timeMax=end_date.isoformat() + 'Z',
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        
         events = events_result.get('items', [])
         return events
+
+    def check_availability(self, start_time: datetime, end_time: datetime) -> bool:
+        """Check if a time slot is available (no conflicting events)."""
+        self._ensure_valid_credentials()
+        service = build('calendar', 'v3', credentials=self.credentials)
+        
+        # Get events that overlap with the requested time slot
+        events_result = service.events().list(
+            calendarId='primary',
+            timeMin=start_time.isoformat() + 'Z',
+            timeMax=end_time.isoformat() + 'Z',
+            singleEvents=True
+        ).execute()
+        
+        events = events_result.get('items', [])
+        
+        # Filter out events that are marked as 'transparent' (free time)
+        conflicting_events = [
+            event for event in events 
+            if event.get('transparency', 'opaque') != 'transparent'
+        ]
+        
+        return len(conflicting_events) == 0
+
+    def get_available_slots(self, date: datetime, duration_minutes: int = 30) -> list:
+        """Get available time slots for a given date."""
+        self._ensure_valid_credentials()
+        service = build('calendar', 'v3', credentials=self.credentials)
+        
+        # Define business hours (9 AM to 5 PM)
+        start_hour = 9
+        end_hour = 17
+        
+        # Ensure date is timezone-aware (UTC)
+        if date.tzinfo is None:
+            date = date.replace(tzinfo=timezone.utc)
+        
+        # Create start and end times for the day (timezone-aware)
+        day_start = date.replace(hour=start_hour, minute=0, second=0, microsecond=0)
+        day_end = date.replace(hour=end_hour, minute=0, second=0, microsecond=0)
+        
+        # Get all events for the day
+        events_result = service.events().list(
+            calendarId='primary',
+            timeMin=day_start.isoformat(),
+            timeMax=day_end.isoformat(),
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        
+        events = events_result.get('items', [])
+        
+        # Filter out transparent events (free time)
+        busy_events = [
+            event for event in events 
+            if event.get('transparency', 'opaque') != 'transparent'
+        ]
+        
+        # Generate available slots
+        available_slots = []
+        current_time = day_start
+        
+        while current_time + timedelta(minutes=duration_minutes) <= day_end:
+            slot_end = current_time + timedelta(minutes=duration_minutes)
+            
+            # Check if this slot conflicts with any busy events
+            is_available = True
+            for event in busy_events:
+                # Parse event times and ensure they're timezone-aware
+                event_start_str = event['start'].get('dateTime', event['start'].get('date'))
+                event_end_str = event['end'].get('dateTime', event['end'].get('date'))
+                
+                # Handle both dateTime and date formats
+                if 'T' in event_start_str:  # dateTime format
+                    event_start = datetime.fromisoformat(event_start_str.replace('Z', '+00:00'))
+                    event_end = datetime.fromisoformat(event_end_str.replace('Z', '+00:00'))
+                else:  # date format (all-day events)
+                    event_start = datetime.fromisoformat(event_start_str).replace(tzinfo=timezone.utc)
+                    event_end = datetime.fromisoformat(event_end_str).replace(tzinfo=timezone.utc)
+                
+                # Check for overlap
+                if (current_time < event_end and slot_end > event_start):
+                    is_available = False
+                    break
+            
+            if is_available:
+                available_slots.append({
+                    'start_time': current_time,
+                    'end_time': slot_end
+                })
+            
+            # Move to next slot (30-minute intervals)
+            current_time += timedelta(minutes=30)
+        
+        return available_slots
+
+    def create_event(
+        self,
+        title: str,
+        start_time: datetime,
+        end_time: datetime,
+        guest_email: str,
+        host_email: str,
+        description: Optional[str] = None,
+        location: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Create a calendar event for a booking."""
+        self._ensure_valid_credentials()
+        
+        service = build('calendar', 'v3', credentials=self.credentials)
+        
+        event = {
+            'summary': title,
+            'description': description or f"Meeting with {guest_email}",
+            'start': {
+                'dateTime': start_time.isoformat(),
+                'timeZone': 'UTC',
+            },
+            'end': {
+                'dateTime': end_time.isoformat(),
+                'timeZone': 'UTC',
+            },
+            'attendees': [
+                {'email': guest_email},
+                {'email': host_email},
+            ],
+            'reminders': {
+                'useDefault': False,
+                'overrides': [
+                    {'method': 'email', 'minutes': 24 * 60},  # 24 hours before
+                    {'method': 'popup', 'minutes': 15},        # 15 minutes before
+                ],
+            },
+            'guestsCanSeeOtherGuests': False,
+            'guestsCanModify': False,
+        }
+        
+        if location:
+            event['location'] = location
+        
+        created_event = service.events().insert(calendarId='primary', body=event, sendUpdates='all').execute()
+        return created_event
+
+    def update_event(
+        self,
+        event_id: str,
+        title: Optional[str] = None,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        description: Optional[str] = None,
+        location: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Update an existing calendar event."""
+        self._ensure_valid_credentials()
+        
+        service = build('calendar', 'v3', credentials=self.credentials)
+        
+        # Get the existing event
+        event = service.events().get(calendarId='primary', eventId=event_id).execute()
+        
+        # Update fields if provided
+        if title:
+            event['summary'] = title
+        if description:
+            event['description'] = description
+        if location:
+            event['location'] = location
+        if start_time:
+            event['start'] = {
+                'dateTime': start_time.isoformat(),
+                'timeZone': 'UTC',
+            }
+        if end_time:
+            event['end'] = {
+                'dateTime': end_time.isoformat(),
+                'timeZone': 'UTC',
+            }
+        
+        updated_event = service.events().update(
+            calendarId='primary', 
+            eventId=event_id, 
+            body=event,
+            sendUpdates='all'
+        ).execute()
+        return updated_event
+
+    def delete_event(self, event_id: str) -> bool:
+        """Delete a calendar event."""
+        try:
+            self._ensure_valid_credentials()
+            service = build('calendar', 'v3', credentials=self.credentials)
+            service.events().delete(calendarId='primary', eventId=event_id, sendUpdates='all').execute()
+            return True
+        except Exception as e:
+            print(f"Error deleting event: {e}")
+            return False
+
+    def get_event(self, event_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific calendar event."""
+        try:
+            self._ensure_valid_credentials()
+            service = build('calendar', 'v3', credentials=self.credentials)
+            event = service.events().get(calendarId='primary', eventId=event_id).execute()
+            return event
+        except Exception as e:
+            print(f"Error getting event: {e}")
+            return None
