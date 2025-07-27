@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from pathlib import Path
 from fastapi import FastAPI, Request, Form, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -8,6 +9,16 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy.orm import Session
 import requests
 import json
+
+# Load environment variables from .env file if it exists
+env_file = Path(".env")
+if env_file.exists():
+    with open(env_file, "r") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                os.environ[key] = value
 
 from app.api.v1.api import api_router
 from app.core.config import settings
@@ -26,6 +37,41 @@ app = FastAPI(
     version="1.0.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
+
+# Define agent routes early to avoid conflicts
+@app.get("/agent")
+async def agent_redirect():
+    """Redirect /agent to /agent/"""
+    return RedirectResponse(url="/agent/", status_code=302)
+
+@app.get("/agent/")
+async def agent_chat(request: Request, db: Session = Depends(get_db)):
+    """AI Agent Chat Interface"""
+    print("Agent route accessed!")
+    access_token = request.cookies.get("access_token")
+
+    if not access_token:
+        return RedirectResponse(url="/login", status_code=302)
+
+    try:
+        payload = verify_token(access_token)
+        if not payload:
+            return RedirectResponse(url="/login", status_code=302)
+
+        user_email = payload.get("sub")
+        user = get_user_by_email(db, user_email)
+
+        if not user:
+            return RedirectResponse(url="/login", status_code=302)
+
+        return templates.TemplateResponse("agent_chat.html", {
+            "request": request,
+            "current_user": user
+        })
+
+    except Exception as e:
+        print(f"Agent chat error: {e}")
+        return RedirectResponse(url="/login", status_code=302)
 
 # CORS middleware
 app.add_middleware(
@@ -242,7 +288,7 @@ async def google_auth_callback_api(
 # Add web routes directly
 @app.get("/login")
 async def login_get(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return RedirectResponse(url="/")
 
 @app.post("/login")
 async def login_post(
@@ -254,9 +300,8 @@ async def login_post(
     try:
         user = authenticate_user(db, email, password)
         if not user:
-            return templates.TemplateResponse(
-                "login.html", 
-                {"request": request, "error": "Invalid email or password"},
+            return HTMLResponse(
+                '<div class="text-red-600 text-sm">Invalid email or password</div>',
                 status_code=400
             )
         
@@ -264,7 +309,9 @@ async def login_post(
         access_token = create_access_token(data={"sub": user.email})
         
         # Create response with redirect
-        response = RedirectResponse(url="/dashboard", status_code=302)
+        response = HTMLResponse(
+            '<div class="text-green-600 text-sm">Login successful! Redirecting...</div><script>setTimeout(() => window.location.href = "/dashboard", 1000);</script>'
+        )
         
         # Set HTTP-only cookie
         response.set_cookie(
@@ -279,31 +326,28 @@ async def login_post(
         return response
         
     except Exception as e:
-        return templates.TemplateResponse(
-            "login.html", 
-            {"request": request, "error": "An error occurred during login"},
+        return HTMLResponse(
+            '<div class="text-red-600 text-sm">An error occurred during login</div>',
             status_code=500
         )
 
 @app.get("/register")
 async def register_get(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request})
+    return RedirectResponse(url="/")
 
 @app.post("/register")
 async def register_post(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
-    full_name: str = Form(...),
     db: Session = Depends(get_db)
 ):
     try:
         # Check if user already exists
         existing_user = db.query(User).filter(User.email == email).first()
         if existing_user:
-            return templates.TemplateResponse(
-                "register.html", 
-                {"request": request, "error": "Email already registered"},
+            return HTMLResponse(
+                '<div class="text-red-600 text-sm">Email already registered</div>',
                 status_code=400
             )
         
@@ -311,7 +355,7 @@ async def register_post(
         user_data = UserCreate(
             email=email,
             password=password,
-            full_name=full_name
+            full_name=email.split('@')[0]  # Use email prefix as name
         )
         
         user = await create_user(db, user_data)
@@ -321,16 +365,13 @@ async def register_post(
             from app.services.email_service import send_verification_email
             send_verification_email(user.email, user.verification_token)
         
-        return templates.TemplateResponse(
-            "register.html", 
-            {"request": request, "success": "Registration successful! Please check your email to verify your account."},
-            status_code=200
+        return HTMLResponse(
+            '<div class="text-green-600 text-sm">Registration successful! Please check your email to verify your account.</div>'
         )
         
     except Exception as e:
-        return templates.TemplateResponse(
-            "register.html", 
-            {"request": request, "error": "An error occurred during registration"},
+        return HTMLResponse(
+            '<div class="text-red-600 text-sm">An error occurred during registration</div>',
             status_code=500
         )
 
@@ -828,6 +869,15 @@ async def get_public_booking_page(
     db: Session = Depends(get_db),
 ):
     """Render the public booking page for a given scheduling slug."""
+    
+    print(f"Catch-all route accessed with slug: {scheduling_slug}")
+    
+    # Exclude certain paths that should not be treated as scheduling slugs
+    excluded_paths = ["agent", "dashboard", "login", "register", "logout", "verify-email", "auth"]
+    if scheduling_slug in excluded_paths:
+        print(f"Excluded path: {scheduling_slug}")
+        raise HTTPException(status_code=404, detail="Page not found")
+    
     from app.services.user_service import get_user_by_scheduling_slug
     from app.services.availability_service import get_available_slots_for_booking
     

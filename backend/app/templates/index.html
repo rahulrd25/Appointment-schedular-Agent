@@ -1,17 +1,341 @@
 {% extends "base.html" %}
 
-{% block title %}Welcome | Appointment Agent{% endblock %}
+{% block title %}AI Appointment Scheduler - Your Intelligent Scheduling Assistant{% endblock %}
 
 {% block content %}
-<div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900">
-  <div class="w-full max-w-md bg-gray-800 bg-opacity-90 rounded-2xl shadow-2xl p-10 flex flex-col items-center">
-    <svg class="w-16 h-16 text-indigo-400 mb-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <h1 class="text-4xl font-extrabold text-indigo-300 mb-2 tracking-tight">Appointment Agent</h1>
-    <p class="text-lg text-gray-400 mb-8 text-center">Your intelligent assistant for seamless scheduling and calendar management.</p>
-    <div class="flex flex-col w-full gap-4">
-      <a href="/login" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-bold py-3 rounded-lg shadow-md text-center text-lg hover:from-indigo-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 transition-all">Login</a>
-      <a href="/register" class="w-full bg-gradient-to-r from-green-500 to-indigo-600 text-white font-bold py-3 rounded-lg shadow-md text-center text-lg hover:from-green-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 transition-all">Register</a>
+<div class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+  <!-- Navigation -->
+  <nav class="bg-white/90 backdrop-blur-sm shadow-sm border-b border-gray-200/50 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex items-center">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              </svg>
+            </div>
+            <h1 class="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">AI Scheduler</h1>
+          </div>
+        </div>
+        <div class="hidden md:flex items-center space-x-8">
+          <a href="#features" class="text-gray-600 hover:text-indigo-600 transition-colors font-medium">Features</a>
+          <a href="#how-it-works" class="text-gray-600 hover:text-indigo-600 transition-colors font-medium">How it works</a>
+          <a href="#connect" class="text-gray-600 hover:text-indigo-600 transition-colors font-medium">Get Started</a>
+        </div>
+        <div class="md:hidden">
+          <button class="text-gray-600 hover:text-indigo-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="relative py-12 lg:py-16">
+    <div class="max-w-6xl mx-auto px-4">
+      <div class="grid lg:grid-cols-2 gap-16 lg:gap-20 items-center justify-center">
+        <!-- Left Side - Content -->
+        <div class="space-y-6">
+          <div class="space-y-4">
+            <h1 class="text-4xl lg:text-6xl font-bold text-gray-900 leading-tight">
+              Your AI-Powered
+              <span class="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Appointment Scheduler</span>
+            </h1>
+            <p class="text-lg lg:text-xl text-gray-600 leading-relaxed">
+              Let AI handle your scheduling. Connect your calendar and watch as your AI assistant manages meetings, checks availability, and keeps your schedule organized.
+            </p>
+          </div>
+          
+          <!-- CTA Buttons -->
+          <div class="flex flex-col sm:flex-row gap-4">
+            <a href="/auth/google" class="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
+              <svg class="w-5 h-5 mr-3" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Connect with Google
+            </a>
+            <button onclick="showEmailForm()" class="inline-flex items-center justify-center px-8 py-4 bg-white text-gray-700 font-semibold rounded-xl shadow-lg hover:shadow-xl border border-gray-200 transform hover:scale-105 transition-all duration-300">
+              <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+              </svg>
+              Connect with Email
+            </button>
+          </div>
+        </div>
+
+        <!-- Right Side - AI Demo -->
+        <div class="relative flex justify-center lg:justify-start">
+          <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200/50 w-80 h-[500px] p-6 flex flex-col relative overflow-hidden group">
+            <!-- Animated Background -->
+            <div class="absolute inset-0 bg-gradient-to-br from-indigo-50/50 via-purple-50/30 to-pink-50/50 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            
+            <!-- Header -->
+            <div class="text-center mb-6 relative z-10">
+              <div class="inline-flex items-center justify-center w-10 h-10 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl mb-3 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                </svg>
+              </div>
+              <h2 class="text-xl font-bold text-gray-900 mb-2 group-hover:text-indigo-600 transition-colors duration-300">AI Demo</h2>
+              <p class="text-gray-600 text-sm group-hover:text-indigo-500 transition-colors duration-300">See how easy it is</p>
+            </div>
+            
+            <!-- Content -->
+            <div class="flex-1 space-y-4 text-sm text-gray-700 relative z-10">
+              <!-- AI Message -->
+              <div class="flex items-start space-x-2 animate-fade-in-up" style="animation-delay: 0.2s;">
+                <div class="w-6 h-6 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-md group-hover:shadow-lg transition-shadow duration-300">
+                  <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                  </svg>
+                </div>
+                <div class="bg-white rounded-lg p-3 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border border-gray-100">
+                  <p class="text-gray-800 text-sm">Hi! I'm your AI scheduler. What can I help you with today?</p>
+                </div>
+              </div>
+              
+              <!-- User Message -->
+              <div class="flex items-start space-x-2 justify-end animate-fade-in-up" style="animation-delay: 0.6s;">
+                <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg p-3 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] max-w-48">
+                  <p class="text-white text-sm">I need to schedule a meeting with John tomorrow at 2pm</p>
+                </div>
+                <div class="w-6 h-6 bg-gray-400 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                  <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                  </svg>
+                </div>
+              </div>
+              
+              <!-- Success Message -->
+              <div class="flex items-start space-x-2 animate-fade-in-up" style="animation-delay: 1s;">
+                <div class="w-6 h-6 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0 shadow-md group-hover:shadow-lg transition-shadow duration-300">
+                  <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                </div>
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 shadow-md hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border-l-4 border-green-500">
+                  <p class="text-gray-800 text-sm">
+                    <span class="text-green-600 font-semibold">✅ Meeting scheduled!</span> Your meeting with John is set for tomorrow at 2pm. Calendar invite sent to john@email.com
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Footer -->
+            <div class="text-center mt-6 relative z-10">
+              <div class="inline-flex items-center space-x-2 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-lg px-3 py-2 group-hover:from-indigo-200 group-hover:to-purple-200 transition-all duration-300">
+                <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+                <p class="text-gray-700 font-semibold text-base group-hover:text-indigo-700 transition-colors duration-300">Ready to try it yourself?</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section id="features" class="py-20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl font-bold text-gray-900 mb-4">Why Choose AI Scheduler?</h2>
+        <p class="text-xl text-gray-600 max-w-3xl mx-auto">Experience the future of appointment scheduling with intelligent automation and natural conversations</p>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-gray-200/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] group">
+          <div class="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-3">Natural Conversations</h3>
+          <p class="text-gray-600">Chat naturally with your AI scheduler. No forms, no complexity - just tell it what you need.</p>
+        </div>
+        
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-gray-200/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] group">
+          <div class="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-3">Smart Availability</h3>
+          <p class="text-gray-600">AI learns your preferences and suggests optimal times, automatically handling conflicts.</p>
+        </div>
+        
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-gray-200/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] group">
+          <div class="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-3">Calendar Sync</h3>
+          <p class="text-gray-600">Seamlessly integrates with Google Calendar, Outlook, and other popular platforms.</p>
+        </div>
+        
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-gray-200/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] group">
+          <div class="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5zM4 19h6v-2H4v2zM4 15h6v-2H4v2zM4 11h6V9H4v2zM4 7h6V5H4v2zM10 7h10V5H10v2zM10 11h10V9H10v2zM10 15h10v-2H10v2zM10 19h10v-2H10v2z"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-3">Auto Reminders</h3>
+          <p class="text-gray-600">Automatic email confirmations and reminders keep everyone informed and on time.</p>
+        </div>
+        
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-gray-200/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] group">
+          <div class="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-3">24/7 Availability</h3>
+          <p class="text-gray-600">Your AI scheduler works around the clock, handling requests even when you're unavailable.</p>
+        </div>
+        
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-gray-200/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] group">
+          <div class="w-12 h-12 bg-gradient-to-r from-teal-500 to-green-500 rounded-xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-bold text-gray-900 mb-3">Analytics & Insights</h3>
+          <p class="text-gray-600">Get insights into your scheduling patterns and optimize your time management.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it Works Section -->
+  <section id="how-it-works" class="py-20 bg-white/50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h2 class="text-4xl font-bold text-gray-900 mb-4">How AI Scheduler Works</h2>
+        <p class="text-xl text-gray-600 max-w-3xl mx-auto">Get started in minutes with our simple 4-step process</p>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div class="text-center">
+          <div class="w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-6 shadow-lg">1</div>
+          <h3 class="text-xl font-bold text-gray-900 mb-3">Connect</h3>
+          <p class="text-gray-600">Connect your calendar with Google or email authentication</p>
+        </div>
+        
+        <div class="text-center">
+          <div class="w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-6 shadow-lg">2</div>
+          <h3 class="text-xl font-bold text-gray-900 mb-3">Chat</h3>
+          <p class="text-gray-600">Start a conversation with your AI scheduler</p>
+        </div>
+        
+        <div class="text-center">
+          <div class="w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-6 shadow-lg">3</div>
+          <h3 class="text-xl font-bold text-gray-900 mb-3">Schedule</h3>
+          <p class="text-gray-600">AI handles the scheduling and sends confirmations</p>
+        </div>
+        
+        <div class="text-center">
+          <div class="w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-6 shadow-lg">4</div>
+          <h3 class="text-xl font-bold text-gray-900 mb-3">Done</h3>
+          <p class="text-gray-600">Your calendar is updated and everyone is notified</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Email Form Modal (Hidden by default) -->
+<div id="email-form-container" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-2xl p-8 border border-gray-200 shadow-xl max-w-md mx-4">
+    <div class="text-center mb-6">
+      <h3 class="text-2xl font-bold text-gray-900 mb-2">Connect with Email</h3>
+      <p class="text-gray-600">Enter your email to get started</p>
+    </div>
+    
+    <form id="email-form" hx-post="/connect-email" hx-target="#email-response" hx-swap="innerHTML" class="space-y-4">
+      <div>
+        <input 
+          type="email" 
+          name="email" 
+          required 
+          class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-base"
+          placeholder="Enter your email address"
+        />
+      </div>
+      
+      <button 
+        type="submit" 
+        class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-3 px-4 rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+      >
+        Start Scheduling
+      </button>
+    </form>
+    
+    <div id="email-response" class="mt-4 text-center"></div>
+    
+    <button onclick="hideEmailForm()" class="w-full mt-4 text-gray-600 hover:text-gray-800 font-medium">
+      ← Back to options
+    </button>
   </div>
 </div>
+
+<script>
+function showEmailForm() {
+  document.getElementById('email-form-container').classList.remove('hidden');
+}
+
+function hideEmailForm() {
+  document.getElementById('email-form-container').classList.add('hidden');
+}
+
+// Handle successful connection redirects
+document.addEventListener('htmx:afterRequest', function(event) {
+  if (event.detail.xhr.status === 200) {
+    const response = event.detail.xhr.responseText;
+    if (response.includes('redirect') || response.includes('dashboard')) {
+      window.location.href = '/dashboard';
+    }
+  }
+});
+
+// Smooth scrolling for anchor links
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+  anchor.addEventListener('click', function (e) {
+    e.preventDefault();
+    const target = document.querySelector(this.getAttribute('href'));
+    if (target) {
+      target.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  });
+});
+</script>
 {% endblock %}
+
+<style>
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+  opacity: 0;
+}
+</style>

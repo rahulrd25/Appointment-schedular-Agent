@@ -19,15 +19,19 @@ def get_current_user_from_cookie(
 ) -> UserModel:
     """Get current user from cookie-based authentication"""
     token = request.cookies.get("access_token")
-    if not token or not token.startswith("Bearer "):
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, 
             detail="Not authenticated"
         )
     
+    # Handle both "Bearer token" and "token" formats
+    if token.startswith("Bearer "):
+        token = token[7:]  # Remove "Bearer " prefix
+    
     try:
         payload = jwt.decode(
-            token[7:], 
+            token, 
             settings.SECRET_KEY, 
             algorithms=["HS256"]
         )

@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     FRONTEND_URL: str = "http://localhost:8000"
     
+    # LLM settings
+    LLM_PROVIDER: str = "openai"  # "openai" or "claude"
+    OPENAI_API_KEY: Optional[str] = None
+    ANTHROPIC_API_KEY: Optional[str] = None
+    
     class Config:
         env_file = ".env"
         case_sensitive = False
