@@ -11,10 +11,12 @@ from googleapiclient.discovery import build
 class GoogleCalendarService:
     def __init__(self, access_token: str = None, refresh_token: str = None):
         self.credentials = None
-        if access_token and refresh_token:
+        if access_token:
+            # Create credentials with available tokens
+            # Note: refresh_token can be None for some OAuth flows
             self.credentials = Credentials(
                 token=access_token,
-                refresh_token=refresh_token,
+                refresh_token=refresh_token,  # Can be None
                 token_uri="https://oauth2.googleapis.com/token",
                 client_id=os.getenv("GOOGLE_CLIENT_ID"),
                 client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),

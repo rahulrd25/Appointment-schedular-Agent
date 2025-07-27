@@ -24,6 +24,10 @@ dependencies = [
     "google-auth-httplib2",
     "requests",
     "email-validator",
+    "openai>=1.97.1",
+    "anthropic>=0.59.0",
+    "langchain>=0.2.17",
+    "langchain-openai>=0.1.25",
 ]
 
 [project.optional-dependencies]

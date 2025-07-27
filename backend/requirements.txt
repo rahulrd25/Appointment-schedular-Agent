@@ -12,3 +12,5 @@ passlib[bcrypt]
 sendgrid
 jinja2
 psycopg2-binary
+openai
+anthropic
