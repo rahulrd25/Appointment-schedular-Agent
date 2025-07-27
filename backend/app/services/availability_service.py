@@ -121,8 +121,9 @@ def check_slot_availability(db: Session, slot_id: int) -> bool:
     if not slot or not slot.is_available:
         return False
     
-    # Check if slot is in the future
-    if slot.start_time <= datetime.utcnow():
+    # Check if slot is in the future - ensure timezone-naive comparison
+    slot_start_naive = slot.start_time.replace(tzinfo=None) if slot.start_time.tzinfo else slot.start_time
+    if slot_start_naive <= datetime.utcnow():
         return False
     
     # Check if slot is already booked
@@ -226,19 +227,31 @@ class AvailabilityService:
         slots = get_availability_slots_for_user(self.db, user_id)
         
         if date:
-            # Filter by date
+            # Filter by date - ensure timezone-naive comparison
             date_start = date.replace(hour=0, minute=0, second=0, microsecond=0)
             date_end = date.replace(hour=23, minute=59, second=59, microsecond=999999)
-            slots = [s for s in slots if date_start <= s.start_time <= date_end]
+            
+            # Convert slots to timezone-naive for comparison
+            filtered_slots = []
+            for slot in slots:
+                # Make slot times timezone-naive for comparison
+                slot_start = slot.start_time.replace(tzinfo=None) if slot.start_time.tzinfo else slot.start_time
+                if date_start <= slot_start <= date_end:
+                    filtered_slots.append(slot)
+            slots = filtered_slots
         
         # Convert to dictionary format
         result = []
         for slot in slots:
+            # Ensure timezone-naive datetime for JSON serialization
+            start_time = slot.start_time.replace(tzinfo=None) if slot.start_time.tzinfo else slot.start_time
+            end_time = slot.end_time.replace(tzinfo=None) if slot.end_time.tzinfo else slot.end_time
+            
             result.append({
                 "id": slot.id,
-                "start_time": slot.start_time.isoformat(),
-                "end_time": slot.end_time.isoformat(),
-                "duration_minutes": int((slot.end_time - slot.start_time).total_seconds() / 60),
+                "start_time": start_time.isoformat(),
+                "end_time": end_time.isoformat(),
+                "duration_minutes": int((end_time - start_time).total_seconds() / 60),
                 "is_available": slot.is_available
             })
         

@@ -102,7 +102,7 @@ async def google_calendar_auth():
         "https://accounts.google.com/o/oauth2/v2/auth?"
         f"client_id={settings.GOOGLE_CLIENT_ID}&"
         "response_type=code&"
-        "scope=openid email profile https://www.googleapis.com/auth/calendar.events&"
+        "scope=openid email profile https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly&"
         f"redirect_uri={settings.GOOGLE_REDIRECT_URI}&"
         "access_type=offline&"
         "prompt=consent&"
@@ -928,3 +928,198 @@ async def get_public_booking_page(
             "availability_slots": availability_slots
         }
     )
+
+@app.get("/{scheduling_slug}/all-in-one", response_class=HTMLResponse)
+async def get_all_in_one_booking_page(
+    request: Request,
+    scheduling_slug: str,
+    db: Session = Depends(get_db),
+):
+    """Render the all-in-one booking page for a given scheduling slug."""
+    
+    print(f"All-in-one route accessed with slug: {scheduling_slug}")
+    
+    from app.services.user_service import get_user_by_scheduling_slug
+    
+    user = await get_user_by_scheduling_slug(db, scheduling_slug)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Check if user has connected their calendar
+    if not user.google_calendar_connected:
+        return templates.TemplateResponse(
+            "public_booking_unavailable.html", {
+                "request": request, 
+                "user": user,
+                "reason": "calendar_not_connected"
+            }
+        )
+
+    return templates.TemplateResponse(
+        "public_booking_all_in_one.html", {
+            "request": request, 
+            "user": user
+        }
+    )
+
+@app.get("/api/v1/calendar/available-slots/{user_slug}/{date}")
+async def get_available_slots_for_date(
+    user_slug: str,
+    date: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Get available time slots for a specific date from Google Calendar."""
+    try:
+        # Parse the date
+        from datetime import datetime
+        selected_date = datetime.strptime(date, "%Y-%m-%d")
+        
+        # Get the user by scheduling slug
+        from app.services.user_service import get_user_by_scheduling_slug
+        user = await get_user_by_scheduling_slug(db, user_slug)
+        
+        if not user:
+            return {"error": "User not found"}
+        
+        if not user.google_calendar_connected:
+            return {"error": "Google Calendar not connected"}
+        
+        # Initialize Google Calendar service
+        from app.services.google_calendar_service import GoogleCalendarService
+        calendar_service = GoogleCalendarService(
+            access_token=user.google_access_token,
+            refresh_token=user.google_refresh_token
+        )
+        
+        # Get available slots for the date using user's timezone
+        try:
+            # Use user's timezone or default to UTC
+            user_timezone = getattr(user, 'timezone', 'UTC') or 'UTC'
+            
+            available_slots = calendar_service.get_available_slots(
+                selected_date, 
+                duration_minutes=30
+            )
+            
+            # Convert to JSON-serializable format
+            slots_data = []
+            for slot in available_slots:
+                slots_data.append({
+                    "id": f"slot_{slot['start_time']}",
+                    "start_time": slot['start_time'].isoformat(),
+                    "end_time": slot['end_time'].isoformat(),
+                    "start_time_utc": slot['start_time'].isoformat(),
+                    "end_time_utc": slot['end_time'].isoformat(),
+                    "timezone": "UTC"
+                })
+            
+            return slots_data
+            
+        except Exception as calendar_error:
+            print(f"Google Calendar error: {calendar_error}")
+            # Return error when Google Calendar fails - no more demo mode
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Calendar service unavailable: {str(calendar_error)}"
+            )
+        
+    except Exception as e:
+        print(f"Error getting available slots: {e}")
+        return {"error": str(e)}
+
+@app.post("/api/v1/bookings/book-slot/{user_slug}/")
+async def book_slot_with_calendar(
+    user_slug: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Book a time slot by creating an event in Google Calendar."""
+    try:
+        # Get form data
+        form_data = await request.form()
+        guest_name = form_data.get("guest_name")
+        guest_email = form_data.get("guest_email")
+        guest_message = form_data.get("guest_message", "")
+        
+        if not guest_name or not guest_email:
+            return HTMLResponse(
+                content='<div class="bg-red-50 border border-red-200 rounded-lg p-4"><div class="flex items-center"><svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><p class="text-red-800">Name and email are required</p></div></div>'
+            )
+        
+        # Get the user by scheduling slug
+        from app.services.user_service import get_user_by_scheduling_slug
+        user = await get_user_by_scheduling_slug(db, user_slug)
+        
+        if not user:
+            return HTMLResponse(
+                content='<div class="bg-red-50 border border-red-200 rounded-lg p-4"><div class="flex items-center"><svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><p class="text-red-800">User not found</p></div></div>'
+            )
+        
+        if not user.google_calendar_connected:
+            return HTMLResponse(
+                content='<div class="bg-red-50 border border-red-200 rounded-lg p-4"><div class="flex items-center"><svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><p class="text-red-800">Google Calendar not connected</p></div></div>'
+            )
+        
+        # Get slot start time from form data
+        slot_start_time = form_data.get("slot_start_time")
+        if not slot_start_time:
+            return HTMLResponse(
+                content='<div class="bg-red-50 border border-red-200 rounded-lg p-4"><div class="flex items-center"><svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><p class="text-red-800">Slot start time is required</p></div></div>'
+            )
+        
+        from datetime import datetime, timedelta, timezone
+        start_time = datetime.fromisoformat(slot_start_time)
+        if start_time.tzinfo is None:
+            start_time = start_time.replace(tzinfo=timezone.utc)
+        end_time = start_time + timedelta(minutes=30)  # 30-minute meeting
+        
+        # Initialize Google Calendar service
+        from app.services.google_calendar_service import GoogleCalendarService
+        calendar_service = GoogleCalendarService(
+            access_token=user.google_access_token,
+            refresh_token=user.google_refresh_token
+        )
+        
+        # Try to create the event in Google Calendar
+        try:
+            # Check if slot is still available
+            if not calendar_service.check_availability(start_time, end_time):
+                return HTMLResponse(
+                    content='<div class="bg-red-50 border border-red-200 rounded-lg p-4"><div class="flex items-center"><svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><p class="text-red-800">This time slot is no longer available</p></div></div>'
+                )
+            
+            # Create the event in Google Calendar
+            event_title = f"Meeting with {guest_name}"
+            event_description = f"Meeting with {guest_name}\n\nMessage: {guest_message}" if guest_message else f"Meeting with {guest_name}"
+            
+            event = calendar_service.create_event(
+                title=event_title,
+                start_time=start_time,
+                end_time=end_time,
+                guest_email=guest_email,
+                host_email=user.email,
+                description=event_description,
+                location="Google Meet"
+            )
+            
+            if event:
+                # Return simple success indicator
+                return HTMLResponse(content='<div data-status="success">Booking confirmed!</div>')
+            else:
+                return HTMLResponse(
+                    content='<div class="bg-red-50 border border-red-200 rounded-lg p-4"><div class="flex items-center"><svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><p class="text-red-800">Failed to create calendar event</p></div></div>'
+                )
+                
+        except Exception as calendar_error:
+            print(f"Google Calendar error during booking: {calendar_error}")
+            # Return error when Google Calendar fails - no more demo mode
+            return HTMLResponse(
+                content=f'<div class="bg-red-50 border border-red-200 rounded-lg p-4"><div class="flex items-center"><svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><p class="text-red-800">Calendar service unavailable: {str(calendar_error)}</p></div></div>'
+            )
+        
+    except Exception as e:
+        print(f"Error booking slot: {e}")
+        return HTMLResponse(
+            content=f'<div class="bg-red-50 border border-red-200 rounded-lg p-4"><div class="flex items-center"><svg class="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><p class="text-red-800">Error: {str(e)}</p></div></div>'
+        )
