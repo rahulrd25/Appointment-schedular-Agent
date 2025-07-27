@@ -20,12 +20,12 @@ class GoogleCalendarService:
                 token_uri="https://oauth2.googleapis.com/token",
                 client_id=os.getenv("GOOGLE_CLIENT_ID"),
                 client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-                scopes=["https://www.googleapis.com/auth/calendar.events"],
+                scopes=["https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.readonly"],
             )
 
     def get_authorization_url(self):
         flow = InstalledAppFlow.from_client_secrets_file(
-            'client_secret.json', ["https://www.googleapis.com/auth/calendar.events"]
+            'client_secret.json', ["https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.readonly"]
         )
         flow.redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
         authorization_url, state = flow.authorization_url(
@@ -36,7 +36,7 @@ class GoogleCalendarService:
 
     def get_tokens_from_auth_code(self, auth_code: str):
         flow = InstalledAppFlow.from_client_secrets_file(
-            'client_secret.json', ["https://www.googleapis.com/auth/calendar.events"]
+            'client_secret.json', ["https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.readonly"]
         )
         flow.redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
         flow.fetch_token(code=auth_code)
@@ -64,14 +64,20 @@ class GoogleCalendarService:
         
         # Set default date range if not provided
         if not start_date:
-            start_date = datetime.now()
+            start_date = datetime.now(timezone.utc)
         if not end_date:
             end_date = start_date.replace(hour=23, minute=59, second=59)
         
+        # Ensure datetime objects are timezone-aware
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
+        
         events_result = service.events().list(
             calendarId='primary',
-            timeMin=start_date.isoformat() + 'Z',
-            timeMax=end_date.isoformat() + 'Z',
+            timeMin=start_date.isoformat(),
+            timeMax=end_date.isoformat(),
             singleEvents=True,
             orderBy='startTime'
         ).execute()
@@ -84,11 +90,17 @@ class GoogleCalendarService:
         self._ensure_valid_credentials()
         service = build('calendar', 'v3', credentials=self.credentials)
         
+        # Ensure datetime objects are timezone-aware
+        if start_time.tzinfo is None:
+            start_time = start_time.replace(tzinfo=timezone.utc)
+        if end_time.tzinfo is None:
+            end_time = end_time.replace(tzinfo=timezone.utc)
+        
         # Get events that overlap with the requested time slot
         events_result = service.events().list(
             calendarId='primary',
-            timeMin=start_time.isoformat() + 'Z',
-            timeMax=end_time.isoformat() + 'Z',
+            timeMin=start_time.isoformat(),
+            timeMax=end_time.isoformat(),
             singleEvents=True
         ).execute()
         
@@ -189,6 +201,12 @@ class GoogleCalendarService:
         
         service = build('calendar', 'v3', credentials=self.credentials)
         
+        # Ensure datetime objects are timezone-aware
+        if start_time.tzinfo is None:
+            start_time = start_time.replace(tzinfo=timezone.utc)
+        if end_time.tzinfo is None:
+            end_time = end_time.replace(tzinfo=timezone.utc)
+        
         event = {
             'summary': title,
             'description': description or f"Meeting with {guest_email}",
@@ -246,11 +264,17 @@ class GoogleCalendarService:
         if location:
             event['location'] = location
         if start_time:
+            # Ensure datetime object is timezone-aware
+            if start_time.tzinfo is None:
+                start_time = start_time.replace(tzinfo=timezone.utc)
             event['start'] = {
                 'dateTime': start_time.isoformat(),
                 'timeZone': 'UTC',
             }
         if end_time:
+            # Ensure datetime object is timezone-aware
+            if end_time.tzinfo is None:
+                end_time = end_time.replace(tzinfo=timezone.utc)
             event['end'] = {
                 'dateTime': end_time.isoformat(),
                 'timeZone': 'UTC',

@@ -28,6 +28,7 @@ dependencies = [
     "anthropic>=0.59.0",
     "langchain>=0.2.17",
     "langchain-openai>=0.1.25",
+    "pytz>=2025.2",
 ]
 
 [project.optional-dependencies]

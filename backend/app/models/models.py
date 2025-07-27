@@ -22,6 +22,7 @@ class User(Base):
     google_calendar_connected = Column(Boolean, default=False)  # Track if calendar is connected
     google_calendar_email = Column(String, nullable=True)  # Email of the Google account used for calendar
     scheduling_slug = Column(String, unique=True, index=True)  # For shareable booking links
+    timezone = Column(String, default='UTC')  # User's timezone (e.g., 'America/New_York', 'Europe/London')
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
