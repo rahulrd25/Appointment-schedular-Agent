@@ -922,10 +922,9 @@ async def get_public_booking_page(
             # If calendar check fails, show all slots as available
 
     return templates.TemplateResponse(
-        "public_booking.html", {
+        "public_booking_all_in_one.html", {
             "request": request, 
-            "user": user,
-            "availability_slots": availability_slots
+            "user": user
         }
     )
 
