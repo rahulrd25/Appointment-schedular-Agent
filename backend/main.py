@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 import requests
 import json
 import pytz
+import asyncio
 
 # Load environment variables from .env file if it exists
 env_file = Path(".env")
@@ -628,59 +629,99 @@ async def add_dashboard_availability_slot(
     request: Request, 
     date: str = Form(...),
     start_time: str = Form(...),
-    end_time: str = Form(...),
-    duration: int = Form(30),
-    is_available: bool = Form(True),
+    period: int = Form(30),
     db: Session = Depends(get_db)
 ):
     """Add single availability slot for dashboard (session auth)"""
     access_token = request.cookies.get("access_token")
     if not access_token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        return templates.TemplateResponse("availability_response.html", {
+            "request": request,
+            "message": "Authentication required. Please log in again.",
+            "success": False
+        })
     
     try:
         payload = verify_token(access_token)
         if not payload:
-            raise HTTPException(status_code=401, detail="Invalid token")
+            return templates.TemplateResponse("availability_response.html", {
+                "request": request,
+                "message": "Invalid session. Please log in again.",
+                "success": False
+            })
         
         user_email = payload.get("sub")
         user = get_user_by_email(db, user_email)
         if not user:
-            raise HTTPException(status_code=401, detail="User not found")
+            return templates.TemplateResponse("availability_response.html", {
+                "request": request,
+                "message": "User not found. Please log in again.",
+                "success": False
+            })
         
         from datetime import datetime, timedelta
         from app.services.availability_service import create_availability_slot
         from app.schemas.schemas import AvailabilitySlotCreate
         
-        # Combine date and time
-        start_datetime = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %H:%M")
-        end_datetime = datetime.strptime(f"{date} {end_time}", "%Y-%m-%d %H:%M")
+        # Parse date and time
+        try:
+            start_datetime = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %H:%M")
+            end_datetime = start_datetime + timedelta(minutes=period)
+        except ValueError as e:
+            return templates.TemplateResponse("availability_response.html", {
+                "request": request,
+                "message": f"Invalid date or time format: {str(e)}",
+                "success": False
+            })
         
-        # Create slots based on duration
-        created_slots = []
-        current_time = start_datetime
+        # Validate that the slot is in the future
+        if start_datetime <= datetime.utcnow():
+            return templates.TemplateResponse("availability_response.html", {
+                "request": request,
+                "message": "Cannot create slots in the past. Please select a future date and time.",
+                "success": False
+            })
         
-        while current_time + timedelta(minutes=duration) <= end_datetime:
-            slot_end = current_time + timedelta(minutes=duration)
-            
-            slot_data = AvailabilitySlotCreate(
-                start_time=current_time,
-                end_time=slot_end,
-                is_available=is_available
-            )
-            
-            slot = create_availability_slot(db, slot_data, user.id)
-            created_slots.append(slot)
-            
-            current_time = slot_end
+        # Create the availability slot
+        slot_data = AvailabilitySlotCreate(
+            start_time=start_datetime,
+            end_time=end_datetime,
+            is_available=True
+        )
         
-        return {
-            "message": f"Created {len(created_slots)} availability slots successfully!",
-            "slots_created": len(created_slots)
-        }
+        result = create_availability_slot(db, slot_data, user.id)
+        
+        if not result["success"]:
+            return templates.TemplateResponse("availability_response.html", {
+                "request": request,
+                "message": result["message"],
+                "success": False
+            })
+        
+        # Prepare success message based on calendar creation
+        message = "Slot created successfully in app"
+        if result["calendar_created"] is True:
+            message += " and Google Calendar!"
+        elif result["calendar_created"] is False:
+            message += f" but failed to create in Google Calendar: {result.get('calendar_error', 'Unknown error')}"
+        else:
+            message += " (Google Calendar not connected)."
+        
+        return templates.TemplateResponse("availability_response.html", {
+            "request": request,
+            "message": message,
+            "success": True,
+            "slot": result["slot"],
+            "calendar_created": result["calendar_created"]
+        })
+        
     except Exception as e:
         print(f"Dashboard API error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        return templates.TemplateResponse("availability_response.html", {
+            "request": request,
+            "message": f"Failed to create availability slot: {str(e)}",
+            "success": False
+        })
 
 
 @app.post("/dashboard/api/availability/recurring")
@@ -736,20 +777,31 @@ async def add_recurring_availability_slots(
                         is_available=True
                     )
                     
-                    slot = create_availability_slot(db, slot_data, user.id)
-                    created_slots.append(slot)
+                    slot_result = create_availability_slot(db, slot_data, user.id)
+                    if not slot_result["success"]:
+                        return templates.TemplateResponse("availability_response.html", {
+                            "request": request,
+                            "message": slot_result["message"],
+                            "success": False
+                        })
+                    created_slots.append(slot_result["slot"])
                     
                     current_time = slot_end
             
             current_date += timedelta(days=1)
         
-        return {
+        return templates.TemplateResponse("availability_response.html", {
+            "request": request,
             "message": f"Created {len(created_slots)} recurring availability slots successfully!",
-            "slots_created": len(created_slots)
-        }
+            "slots_created": len(created_slots),
+            "success": True
+        })
     except Exception as e:
         print(f"Recurring slots API error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        return templates.TemplateResponse("availability_response.html", {
+            "request": request,
+            "message": f"Error creating recurring slots: {str(e)}"
+        })
 
 
 @app.post("/dashboard/api/availability/bulk")
@@ -821,17 +873,25 @@ async def add_bulk_availability_slots(
                         is_available=True
                     )
                     
-                    slot = create_availability_slot(db, slot_data, user.id)
-                    created_slots.append(slot)
+                    slot_result = create_availability_slot(db, slot_data, user.id)
+                    if not slot_result["success"]:
+                        return templates.TemplateResponse("availability_response.html", {
+                            "request": request,
+                            "message": slot_result["message"],
+                            "success": False
+                        })
+                    created_slots.append(slot_result["slot"])
                     
                     current_time = slot_end
             
             current_date += timedelta(days=1)
         
-        return {
+        return templates.TemplateResponse("availability_response.html", {
+            "request": request,
             "message": f"Created {len(created_slots)} bulk availability slots successfully!",
-            "slots_created": len(created_slots)
-        }
+            "slots_created": len(created_slots),
+            "success": True
+        })
     except Exception as e:
         print(f"Bulk slots API error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -840,32 +900,67 @@ async def add_bulk_availability_slots(
 @app.post("/dashboard/api/calendar/sync")
 async def sync_calendar_availability_endpoint(request: Request, db: Session = Depends(get_db)):
     """Sync availability slots with Google Calendar."""
+    import asyncio
+    
     access_token = request.cookies.get("access_token")
     if not access_token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        return {"success": False, "message": "Not authenticated"}
     
     try:
         payload = verify_token(access_token)
         if not payload:
-            raise HTTPException(status_code=401, detail="Invalid token")
+            return {"success": False, "message": "Invalid token"}
         
         user_email = payload.get("sub")
         user = get_user_by_email(db, user_email)
         if not user:
-            raise HTTPException(status_code=401, detail="User not found")
+            return {"success": False, "message": "User not found"}
         
         if not user.google_calendar_connected:
             return {"success": False, "message": "Google Calendar not connected"}
         
         from app.services.availability_service import sync_calendar_availability
-        result = sync_calendar_availability(db, user)
         
-        return result
+        # Add timeout to prevent hanging
+        try:
+            # Run sync with timeout
+            result = await asyncio.wait_for(
+                asyncio.to_thread(sync_calendar_availability, db, user),
+                timeout=30.0  # 30 second timeout
+            )
+            return result
+        except asyncio.TimeoutError:
+            return {"success": False, "message": "Sync timed out. Please try again."}
         
     except Exception as e:
         print(f"Calendar sync error: {e}")
         return {"success": False, "message": f"Failed to sync calendar: {str(e)}"}
 
+@app.post("/dashboard/api/calendar/refresh-tokens")
+async def refresh_calendar_tokens_endpoint(request: Request, db: Session = Depends(get_db)):
+    """Proactively refresh Google Calendar tokens."""
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        return {"success": False, "message": "Not authenticated"}
+    
+    try:
+        payload = verify_token(access_token)
+        if not payload:
+            return {"success": False, "message": "Invalid token"}
+        
+        user_email = payload.get("sub")
+        user = get_user_by_email(db, user_email)
+        if not user:
+            return {"success": False, "message": "User not found"}
+        
+        from app.services.availability_service import refresh_google_tokens
+        result = refresh_google_tokens(db, user)
+        
+        return result
+        
+    except Exception as e:
+        print(f"Token refresh error: {e}")
+        return {"success": False, "message": f"Failed to refresh tokens: {str(e)}"}
 
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc):
@@ -1998,6 +2093,43 @@ async def select_time_for_reschedule(
         })
 
 
+@app.get("/availability")
+async def availability_page(request: Request, db: Session = Depends(get_db)):
+    """Availability management page for setting up available time slots"""
+    access_token = request.cookies.get("access_token")
+
+    if not access_token:
+        return RedirectResponse(url="/login", status_code=302)
+
+    try:
+        payload = verify_token(access_token)
+        if not payload:
+            return RedirectResponse(url="/login", status_code=302)
+
+        user_email = payload.get("sub")
+        user = get_user_by_email(db, user_email)
+
+        if not user:
+            return RedirectResponse(url="/login", status_code=302)
+
+        # Get user's availability slots
+        from app.services.availability_service import get_availability_slots_for_user
+        availability_slots = get_availability_slots_for_user(db, user.id)
+
+        from datetime import datetime
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        return templates.TemplateResponse("availability.html", {
+            "request": request,
+            "current_user": user,
+            "availability_slots": availability_slots,
+            "today": today
+        })
+
+    except Exception as e:
+        print(f"Availability page error: {e}")
+        return RedirectResponse(url="/login", status_code=302)
+
 # Public booking route - added directly to main app (MUST be last to avoid conflicts)
 @app.get("/{scheduling_slug}", response_class=HTMLResponse)
 async def get_public_booking_page(
@@ -2010,7 +2142,7 @@ async def get_public_booking_page(
     print(f"Catch-all route accessed with slug: {scheduling_slug}")
     
     # Exclude certain paths that should not be treated as scheduling slugs
-    excluded_paths = ["agent", "dashboard", "login", "register", "logout", "verify-email", "auth", "bookings", "stats"]
+    excluded_paths = ["agent", "dashboard", "login", "register", "logout", "verify-email", "auth", "bookings", "stats", "availability"]
     if scheduling_slug in excluded_paths:
         print(f"Excluded path: {scheduling_slug}")
         raise HTTPException(status_code=404, detail="Page not found")
@@ -2454,6 +2586,4 @@ async def change_password(
             '<div class="text-red-600 text-sm">Failed to change password. Please try again.</div>',
             status_code=500
         )
-
-
 

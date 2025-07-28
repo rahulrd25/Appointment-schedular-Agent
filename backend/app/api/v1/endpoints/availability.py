@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Form
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user, get_db
@@ -88,6 +88,59 @@ def update_slot(
     return slot
 
 
+@router.delete("/bulk-delete")
+def bulk_delete_slots(
+    slot_ids: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Delete multiple availability slots."""
+    if not slot_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No slot IDs provided"
+        )
+    
+    # Parse the slot_ids string into a list of integers
+    try:
+        slot_id_list = [int(id.strip()) for id in slot_ids.split(',') if id.strip()]
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid slot IDs format"
+        )
+    
+    if not slot_id_list:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid slot IDs provided"
+        )
+    
+    deleted_count = 0
+    failed_count = 0
+    calendar_deleted_count = 0
+    calendar_failed_count = 0
+    
+    for slot_id in slot_id_list:
+        result = delete_availability_slot(db=db, slot_id=slot_id, user_id=current_user.id)
+        if result["success"]:
+            deleted_count += 1
+            if result.get("calendar_deleted") is True:
+                calendar_deleted_count += 1
+            elif result.get("calendar_deleted") is False:
+                calendar_failed_count += 1
+        else:
+            failed_count += 1
+    
+    return {
+        "message": f"Deleted {deleted_count} slots successfully",
+        "deleted_count": deleted_count,
+        "failed_count": failed_count,
+        "calendar_deleted_count": calendar_deleted_count,
+        "calendar_failed_count": calendar_failed_count
+    }
+
+
 @router.delete("/{slot_id}")
 def delete_slot(
     slot_id: int,
@@ -95,10 +148,12 @@ def delete_slot(
     current_user: User = Depends(get_current_active_user),
 ):
     """Delete an availability slot."""
-    success = delete_availability_slot(db=db, slot_id=slot_id, user_id=current_user.id)
-    if not success:
+    result = delete_availability_slot(db=db, slot_id=slot_id, user_id=current_user.id)
+    
+    if not result["success"]:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Availability slot not found"
+            detail=result["message"]
         )
-    return {"message": "Availability slot deleted successfully"} 
+    
+    return result 
