@@ -1,0 +1,714 @@
+{% extends "base.html" %}
+
+{% block title %}{{ user.full_name }} - Scheduling{% endblock %}
+
+{% block content %}
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+    }
+
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        overflow: hidden;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        min-height: 600px;
+    }
+
+    .left-panel {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: white;
+        padding: 40px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .profile-img {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        margin-bottom: 20px;
+    }
+
+    .meeting-title {
+        font-size: 28px;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+
+    .meeting-duration {
+        font-size: 16px;
+        opacity: 0.9;
+        margin-bottom: 20px;
+    }
+
+    .meeting-description {
+        font-size: 14px;
+        line-height: 1.6;
+        opacity: 0.8;
+    }
+
+    .right-panel {
+        padding: 40px;
+        background: #fafbfc;
+    }
+
+    .step-header {
+        margin-bottom: 30px;
+    }
+
+    .step-title {
+        font-size: 20px;
+        font-weight: 600;
+        color: #1a1a1a;
+        margin-bottom: 8px;
+    }
+
+    .step-subtitle {
+        color: #666;
+        font-size: 14px;
+    }
+
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 8px;
+        margin-bottom: 30px;
+    }
+
+    .calendar-header {
+        text-align: center;
+        font-weight: 600;
+        color: #666;
+        padding: 10px;
+        font-size: 12px;
+    }
+
+    .calendar-day {
+        aspect-ratio: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 14px;
+        border: 2px solid transparent;
+        color: #000;
+    }
+
+    .calendar-day:hover {
+        background: #e8f2ff;
+    }
+
+    .calendar-day.available {
+        background: white;
+        border-color: #e1e5e9;
+        color: #000;
+    }
+
+    .calendar-day.selected {
+        background: #006bf3;
+        color: white;
+        border-color: #006bf3;
+    }
+
+    .calendar-day.unavailable {
+        color: #ccc;
+        cursor: not-allowed;
+    }
+
+    .time-slots {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+        margin-bottom: 30px;
+    }
+
+    .time-slot {
+        padding: 12px 16px;
+        border: 2px solid #e1e5e9;
+        border-radius: 8px;
+        background: white;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.2s;
+        font-size: 14px;
+        font-weight: 500;
+        color: #000;
+    }
+
+    .time-slot:hover {
+        border-color: #006bf3;
+        background: #f0f8ff;
+    }
+
+    .time-slot.selected {
+        background: #006bf3;
+        color: white;
+        border-color: #006bf3;
+    }
+
+    .booking-form {
+        display: none;
+    }
+
+    .booking-form.show {
+        display: block;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 600;
+        color: #1a1a1a;
+        font-size: 14px;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e1e5e9;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: border-color 0.2s;
+        color: #000;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: #006bf3;
+    }
+
+    .form-textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+
+    .btn {
+        background: #006bf3;
+        color: white;
+        border: none;
+        padding: 14px 24px;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        width: 100%;
+    }
+
+    .btn:hover {
+        background: #0056cc;
+        transform: translateY(-1px);
+    }
+
+    .btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .back-btn {
+        background: transparent;
+        color: #666;
+        border: 2px solid #e1e5e9;
+        margin-bottom: 20px;
+        width: auto;
+        padding: 10px 20px;
+    }
+
+    .back-btn:hover {
+        background: #f5f5f5;
+        transform: none;
+    }
+
+    .confirmation {
+        text-align: center;
+        padding: 40px 20px;
+    }
+
+    .confirmation-icon {
+        width: 80px;
+        height: 80px;
+        background: #10b981;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+        font-size: 32px;
+    }
+
+    .confirmation h2 {
+        color: #1a1a1a;
+        margin-bottom: 10px;
+    }
+
+    .confirmation p {
+        color: #666;
+        line-height: 1.6;
+    }
+
+    @media (max-width: 768px) {
+        .container {
+            grid-template-columns: 1fr;
+            margin: 10px;
+        }
+        
+        .left-panel, .right-panel {
+            padding: 20px;
+        }
+        
+        .time-slots {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+
+<div class="container" x-data="bookingApp()">
+    <!-- Left Panel -->
+    <div class="left-panel">
+        <div class="profile-img">{{ user.full_name[:2].upper() }}</div>
+        <h1 class="meeting-title">30 Minute Meeting</h1>
+        <div class="meeting-duration">⏰ 30 min</div>
+        <div class="meeting-description">
+            Let's discuss your project requirements and explore how we can work together. This meeting will help us understand your needs and provide the best solutions.
+        </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="right-panel">
+        <!-- Step 1: Date Selection -->
+        <div x-show="step === 1" x-transition>
+            <div class="step-header">
+                <h2 class="step-title">Select a Date</h2>
+                <p class="step-subtitle">Choose a date that works for you</p>
+            </div>
+
+            <!-- Month Navigation -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+                <button @click="previousMonth()" style="background: #006bf3; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background-color 0.2s;" onmouseover="this.style.background='#0056cc'" onmouseout="this.style.background='#006bf3'">
+                    ← Previous
+                </button>
+                <h3 style="font-size: 18px; font-weight: 600; color: #1a1a1a;" x-text="currentMonthText"></h3>
+                <button @click="nextMonth()" style="background: #006bf3; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background-color 0.2s;" onmouseover="this.style.background='#0056cc'" onmouseout="this.style.background='#006bf3'">
+                    Next →
+                </button>
+            </div>
+
+            <div class="calendar-grid">
+                <!-- Calendar Headers -->
+                <div class="calendar-header">Sun</div>
+                <div class="calendar-header">Mon</div>
+                <div class="calendar-header">Tue</div>
+                <div class="calendar-header">Wed</div>
+                <div class="calendar-header">Thu</div>
+                <div class="calendar-header">Fri</div>
+                <div class="calendar-header">Sat</div>
+
+                <!-- Calendar Days -->
+                <template x-for="(day, index) in calendarDays" :key="index">
+                    <div 
+                        class="calendar-day"
+                        :class="{
+                            'available': day.isAvailable && day.isCurrentMonth,
+                            'selected': day.isSelected,
+                            'unavailable': !day.isAvailable || !day.isCurrentMonth
+                        }"
+                        @click="selectDate(day)"
+                        x-text="day.dayNumber || ''">
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Step 2: Time Selection -->
+        <div x-show="step === 2" x-transition>
+            <button class="btn back-btn" @click="step = 1">← Back</button>
+            
+            <div class="step-header">
+                <h2 class="step-title">Select a Time</h2>
+                <p class="step-subtitle" x-text="selectedDate ? formatDate(selectedDate) : 'Loading...'"></p>
+            </div>
+
+            <!-- Loading State -->
+            <div x-show="loadingSlots" style="text-align: center; padding: 40px;">
+                <div style="width: 50px; height: 50px; border: 3px solid #f3f3f3; border-top: 3px solid #006bf3; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                <p style="color: #666; font-size: 16px; font-weight: 500;">Loading available times...</p>
+            </div>
+
+            <!-- No Slots Available -->
+            <div x-show="!loadingSlots && availableTimes.length === 0" style="text-align: center; padding: 40px;">
+                <div style="width: 60px; height: 60px; background: #fef3c7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                    <span style="font-size: 24px;">⚠️</span>
+                </div>
+                <p style="color: #666;">No available times for this date.</p>
+            </div>
+
+            <!-- Time Slots -->
+            <div x-show="!loadingSlots && availableTimes.length > 0" class="time-slots">
+                <template x-for="time in availableTimes" :key="time.display">
+                    <div 
+                        class="time-slot"
+                        :class="{ 'selected': selectedTime && selectedTime.iso === time.iso }"
+                        @click="selectTime(time)"
+                        x-text="time.display">
+                    </div>
+                </template>
+            </div>
+
+
+        </div>
+
+        <!-- Step 3: Booking Form -->
+        <div x-show="step === 3" x-transition>
+            <button class="btn back-btn" @click="step = 2">← Back</button>
+            
+            <div class="step-header">
+                <h2 class="step-title">Enter Details</h2>
+                <p class="step-subtitle">Tell us about yourself</p>
+            </div>
+
+            <form @submit.prevent="submitBooking">
+                <div class="form-group">
+                    <label class="form-label">Full Name *</label>
+                    <input 
+                        type="text" 
+                        class="form-input" 
+                        x-model="bookingData.name" 
+                        required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Email Address *</label>
+                    <input 
+                        type="email" 
+                        class="form-input" 
+                        x-model="bookingData.email" 
+                        required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Phone Number</label>
+                    <input 
+                        type="tel" 
+                        class="form-input" 
+                        x-model="bookingData.phone">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Additional Notes</label>
+                    <textarea 
+                        class="form-input form-textarea" 
+                        x-model="bookingData.notes"
+                        placeholder="Tell us what you'd like to discuss..."></textarea>
+                </div>
+
+                <!-- Error Message -->
+                <div x-show="bookingError" style="background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 14px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 16px;">⚠️</span>
+                        <span x-text="bookingError"></span>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn" :disabled="isSubmitting">
+                    Schedule Meeting
+                </button>
+            </form>
+        </div>
+
+        <!-- Step 4: Confirmation -->
+        <div x-show="step === 4" x-transition>
+            <!-- Loader during processing -->
+            <div x-show="isSubmitting" style="text-align: center; padding: 40px 20px;">
+                <div style="width: 40px; height: 40px; border: 3px solid #e5e7eb; border-top: 3px solid #006bf3; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                <h3 style="margin: 0 0 10px 0; color: #1a1a1a; font-size: 18px; font-weight: 600;">Scheduling Meeting...</h3>
+                <p style="margin: 0; color: #666; font-size: 14px;">Please wait while we create your booking</p>
+            </div>
+            
+            <!-- Confirmation message -->
+            <div x-show="!isSubmitting" class="confirmation">
+                <div class="confirmation-icon">✓</div>
+                <h2>Meeting Scheduled!</h2>
+                <p>
+                    <strong x-text="formatDate(selectedDate) + ' at ' + selectedTime.display"></strong>
+                </p>
+                
+
+                
+                <div x-show="bookingResult && bookingResult.google_event_url" style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <h3 style="margin-top: 0; color: #166534;">📅 Calendar Event</h3>
+                    <p style="margin: 10px 0;">The meeting has been added to the calendar. You can view it here:</p>
+                    <a :href="bookingResult.google_event_url" target="_blank" style="background: #10b981; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; display: inline-block; margin-top: 10px;">
+                        📅 View in Google Calendar
+                    </a>
+                </div>
+                
+                <p style="margin-top: 20px; color: #6b7280; font-size: 14px;">
+                    You'll receive calendar invitations and reminders automatically.
+                </p>
+            </div>
+        </div>
+    </div>
+    
+
+</div>
+
+<script>
+    function bookingApp() {
+        return {
+            step: 1,
+            currentMonth: new Date().getMonth(),
+            currentYear: new Date().getFullYear(),
+            selectedDate: null,
+            selectedTime: null,
+            bookingData: {
+                name: '',
+                email: '',
+                phone: '',
+                notes: ''
+            },
+            bookingResult: null,
+            isSubmitting: false,
+            bookingError: null,
+            
+            calendarDays: [],
+            availableTimes: [],
+            loadingSlots: false,
+
+            get currentMonthText() {
+                return new Date(this.currentYear, this.currentMonth).toLocaleString('default', { month: 'long', year: 'numeric' });
+            },
+
+            init() {
+                this.generateCalendar();
+            },
+
+            previousMonth() {
+                if (this.currentMonth === 0) {
+                    this.currentMonth = 11;
+                    this.currentYear--;
+                } else {
+                    this.currentMonth--;
+                }
+                this.generateCalendar();
+            },
+
+            nextMonth() {
+                if (this.currentMonth === 11) {
+                    this.currentMonth = 0;
+                    this.currentYear++;
+                } else {
+                    this.currentMonth++;
+                }
+                this.generateCalendar();
+            },
+
+            generateCalendar() {
+                const year = this.currentYear;
+                const month = this.currentMonth;
+                
+                const firstDay = new Date(year, month, 1);
+                const lastDay = new Date(year, month + 1, 0);
+                
+                const days = [];
+                const today = new Date();
+                // Use local timezone for today's date
+                today.setHours(0, 0, 0, 0);
+                
+                // Fill in days from previous month
+                for (let i = 0; i < firstDay.getDay(); i++) {
+                    days.push({ dayNumber: '', date: '', isAvailable: false, isCurrentMonth: false, isSelected: false, isToday: false });
+                }
+                
+                // Fill in current month days
+                for (let d = 1; d <= lastDay.getDate(); d++) {
+                    const dateObj = new Date(year, month, d);
+                    dateObj.setHours(0, 0, 0, 0);
+                    
+                    const isToday = dateObj.getTime() === today.getTime();
+                    const isFuture = dateObj >= today; // Only future dates are available
+                    const isWeekday = dateObj.getDay() >= 1 && dateObj.getDay() <= 5; // Monday to Friday
+                    const isAvailable = isFuture && isWeekday; // Available if future and weekday
+                    
+                    // Format date in local timezone (YYYY-MM-DD)
+                    const localYear = dateObj.getFullYear();
+                    const localMonth = String(dateObj.getMonth() + 1).padStart(2, '0');
+                    const localDay = String(dateObj.getDate()).padStart(2, '0');
+                    const localDateStr = `${localYear}-${localMonth}-${localDay}`;
+                    
+                    days.push({
+                        dayNumber: d,
+                        date: localDateStr,
+                        isAvailable: isAvailable,
+                        isCurrentMonth: true,
+                        isSelected: this.selectedDate && dateObj.getTime() === this.selectedDate.getTime(),
+                        isToday: isToday
+                    });
+                }
+                
+                // Fill in days to complete the week
+                while (days.length % 7 !== 0) {
+                    days.push({ dayNumber: '', date: '', isAvailable: false, isCurrentMonth: false, isSelected: false, isToday: false });
+                }
+                
+                this.calendarDays = days;
+            },
+
+            async selectDate(day) {
+                if (!day.isAvailable) return;
+                // Create date in user's local timezone
+                this.selectedDate = new Date(day.date + 'T00:00:00');
+                this.calendarDays.forEach(d => d.isSelected = false);
+                day.isSelected = true;
+                
+                // Show loading state
+                this.loadingSlots = true;
+                this.step = 2;
+                
+                // Wait 1 second
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Fetch available slots
+                await this.fetchAvailableSlots();
+            },
+
+            async selectTime(time) {
+                this.selectedTime = time;
+                // Show loading state
+                this.loadingSlots = true;
+                // Wait 1 second
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                // Move to next step
+                this.step = 3;
+                this.loadingSlots = false;
+            },
+
+            formatDate(dateInput) {
+                if (!dateInput) return '';
+                // Handle both Date objects and date strings
+                const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
+                // Use local timezone for formatting
+                return date.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            },
+
+            async fetchAvailableSlots() {
+                if (!this.selectedDate) return;
+                
+                this.loadingSlots = true;
+                this.availableTimes = [];
+                
+                try {
+                    // Format date in user's local timezone (YYYY-MM-DD)
+                    const year = this.selectedDate.getFullYear();
+                    const month = String(this.selectedDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(this.selectedDate.getDate()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}`;
+                    
+                    const response = await fetch(`/api/v1/public/{{ user.scheduling_slug }}/availability?date=${dateStr}`);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.availableTimes = data.available_slots.map(slot => ({
+                            display: slot.start_time,
+                            iso: slot.start_time_iso
+                        }));
+                    } else {
+                        console.error('Failed to fetch available slots');
+                    }
+                } catch (error) {
+                    console.error('Error fetching slots:', error);
+                } finally {
+                    this.loadingSlots = false;
+                }
+            },
+
+            async submitBooking() {
+                if (!this.selectedDate || !this.selectedTime || !this.bookingData.name || !this.bookingData.email) {
+                    return;
+                }
+                
+                // Move to confirmation step and show loader
+                this.step = 4;
+                this.isSubmitting = true;
+                this.bookingError = null;
+                
+                const formData = new FormData();
+                formData.append('guest_name', this.bookingData.name);
+                formData.append('guest_email', this.bookingData.email);
+                formData.append('guest_phone', this.bookingData.phone || '');
+                formData.append('guest_notes', this.bookingData.notes || '');
+                
+                // Format date in user's local timezone
+                const year = this.selectedDate.getFullYear();
+                const month = String(this.selectedDate.getMonth() + 1).padStart(2, '0');
+                const day = String(this.selectedDate.getDate()).padStart(2, '0');
+                const dateStr = `${year}-${month}-${day}`;
+                formData.append('selected_date', dateStr);
+                formData.append('selected_time', this.selectedTime.iso);
+                
+                try {
+                    const response = await fetch(`/api/v1/public/{{ user.scheduling_slug }}/book`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        this.bookingResult = result;
+                        this.isSubmitting = false;
+                    } else {
+                        const error = await response.json();
+                        this.bookingError = error.detail || 'Booking failed. Please try again.';
+                        this.isSubmitting = false;
+                        // Go back to form step if there's an error
+                        this.step = 3;
+                    }
+                } catch (error) {
+                    console.error('Booking error:', error);
+                    this.bookingError = 'Network error. Please check your connection and try again.';
+                    this.isSubmitting = false;
+                    // Go back to form step if there's an error
+                    this.step = 3;
+                }
+            }
+        }
+    }
+</script>
+{% endblock %} 
