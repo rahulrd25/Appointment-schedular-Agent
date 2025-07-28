@@ -6,13 +6,11 @@
     <title>{% block title %}Appointment Agent{% endblock %}</title>
     <link href="/static/css/output.css" rel="stylesheet" />
     <style>
-        [x-cloak] { display: none !important; }
+        [v-cloak] { display: none !important; }
     </style>
-    <script
-      defer
-      src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
-    ></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    {% block head %}{% endblock %}
   </head>
   <body class="bg-gray-900 font-sans antialiased text-white">
     {% block content %}{% endblock %}

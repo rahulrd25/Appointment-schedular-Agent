@@ -17,15 +17,16 @@ class Settings(BaseSettings):
     
     # App settings
     PROJECT_NAME: str = "Appointment Agent"
-    APP_NAME: str = "Appointment Agent"
     API_V1_STR: str = "/api/v1"
     DEBUG: bool = False
     
-    # Email settings
-    SMTP_SERVER: str = "smtp.gmail.com"
-    SMTP_PORT: int = 587
-    SMTP_USERNAME: str = ""
-    SMTP_PASSWORD: str = ""
+    # Email settings (using Gmail API)
+    # SMTP settings removed - using Gmail API only
+    # Legacy email fields (kept for backward compatibility but not used)
+    email_username: Optional[str] = None
+    email_password: Optional[str] = None
+    email_host: Optional[str] = None
+    email_port: Optional[str] = None
     FRONTEND_URL: str = "http://localhost:8000"
     
     # LLM settings
@@ -39,6 +40,3 @@ class Settings(BaseSettings):
 
 # Create settings instance
 settings = Settings()
-
-# Debug: Print loaded values (remove this after testing)
-print(f"Loaded GOOGLE_REDIRECT_URI: {settings.GOOGLE_REDIRECT_URI}")

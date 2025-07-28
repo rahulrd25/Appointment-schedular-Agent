@@ -1,0 +1,94 @@
+<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-auto">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-semibold text-gray-900">Reschedule Booking</h3>
+                    <button hx-get="/bookings" hx-target="#booking-modal" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                {% if error %}
+                <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p class="text-sm text-red-600">{{ error }}</p>
+                </div>
+                {% endif %}
+                
+                <!-- Current Booking Info -->
+                <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+                    <h4 class="font-medium text-blue-900 mb-2">Current Booking</h4>
+                    <div class="text-sm text-blue-800">
+                        <p><strong>Guest:</strong> {{ booking.guest_name }}</p>
+                        <p><strong>Current Time:</strong> {{ booking.start_time.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                    </div>
+                </div>
+                
+                <!-- Date Selection -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select New Date</label>
+                    <input 
+                        type="date" 
+                        name="new_date" 
+                        id="date-input"
+                        required 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                        min="{{ today }}"
+                        hx-get="/bookings/api/{{ booking_id }}/available-slots"
+                        hx-target="#time-slots"
+                        hx-trigger="change"
+                        hx-swap="innerHTML"
+                        hx-include="this"
+                    >
+                </div>
+                
+                <!-- Time Slots -->
+                <div id="time-slots" class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select New Time</label>
+                    <div class="text-center py-4 text-gray-500 text-sm">
+                        Select a date to see available time slots
+                    </div>
+                </div>
+                
+                <!-- Reason Field -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Reason for Rescheduling (Optional)</label>
+                    <textarea 
+                        name="reason" 
+                        id="reason-input"
+                        rows="2" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900" 
+                        placeholder="Reason for rescheduling..."
+                    ></textarea>
+                </div>
+                
+                <form hx-post="/bookings/api/{{ booking_id }}/reschedule" hx-target="#booking-modal">
+                    <input type="hidden" name="new_date" id="selected-date" value="">
+                    <input type="hidden" name="new_time" id="selected-time" value="">
+                    <input type="hidden" name="reason" id="selected-reason" value="">
+                    
+                    <!-- Target for form field updates -->
+                    <div id="form-updates"></div>
+                    
+                    <div class="flex justify-end space-x-3">
+                        <button 
+                            type="button" 
+                            hx-get="/bookings" 
+                            hx-target="#booking-modal" 
+                            class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                            Cancel
+                        </button>
+
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+ 

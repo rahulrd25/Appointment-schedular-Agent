@@ -4,10 +4,10 @@
 
 {% block content %}
 <div class="bg-gray-50 min-h-screen text-gray-900">
-    <div x-data="bookingApp()" x-init="init()" class="max-w-4xl mx-auto p-4">
+    <div id="booking-app" class="max-w-4xl mx-auto p-4">
         
         <!-- Welcome Section -->
-        <div x-show="!selectedDate" class="flex items-center justify-center min-h-screen w-full">
+        <div v-show="!selectedDate" class="flex items-center justify-center min-h-screen w-full">
             <div class="flex flex-col items-center justify-center w-full text-center">
                 <h1 class="text-3xl font-bold text-gray-800 mb-4">Welcome to the booking agent for {{ user.full_name }}</h1>
                 <p class="text-lg text-gray-500 mb-8">We will help you find the perfect time for your meeting.</p>
@@ -23,7 +23,7 @@
         </div>
 
         <!-- Loading State -->
-        <div x-show="starting" class="flex items-center justify-center min-h-screen w-full">
+        <div v-show="starting" class="flex items-center justify-center min-h-screen w-full">
             <div class="text-center">
                 <div class="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-3 animate-spin">
                     <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -37,7 +37,7 @@
         </div>
 
         <!-- Calendar Selection -->
-        <div x-show="selectedDate && !selectedSlot" class="flex items-center justify-center min-h-screen w-full">
+        <div v-show="selectedDate && !selectedSlot" class="flex items-center justify-center min-h-screen w-full">
             <div class="bg-gray-100 text-gray-900 rounded-xl shadow-lg w-[36rem] h-[36rem] max-w-[36rem] flex flex-col items-center justify-center p-10">
                 <h2 class="text-2xl font-bold mb-6">Select the date you would like from below</h2>
                 <div class="flex items-center justify-between w-full mb-4">
@@ -47,7 +47,7 @@
                         </svg>
                     </button>
                     <div class="text-center flex-1">
-                        <span class="text-lg font-semibold text-gray-900" x-text="currentMonthText"></span>
+                        <span class="text-lg font-semibold text-gray-900">{{ currentMonthText }}</span>
                     </div>
                     <button @click="nextMonth()" class="p-2 rounded-full hover:bg-gray-200 transition">
                         <svg class="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -57,12 +57,12 @@
                 </div>
                 <div class="w-full">
                     <div class="grid grid-cols-7 mb-2">
-                        <template x-for="day in ['S','M','T','W','T','F','S']" :key="day">
-                            <div class="text-center text-xs font-semibold text-gray-500 py-1" x-text="day"></div>
+                        <template v-for="day in ['S','M','T','W','T','F','S']" :key="day">
+                            <div class="text-center text-xs font-semibold text-gray-500 py-1">{{ day }}</div>
                         </template>
                     </div>
                     <div class="grid grid-cols-7 gap-1">
-                        <template x-for="day in calendarDays" :key="day.date">
+                        <template v-for="day in calendarDays" :key="day.date">
                             <button @click="selectDate(day)" :disabled="!day.isAvailable"
                                 class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400"
                                 :class="{
@@ -72,7 +72,7 @@
                                     'bg-yellow-200 text-yellow-800 font-semibold': day.isToday && !day.isSelected,
                                     'bg-gray-100 text-gray-400': !day.isCurrentMonth
                                 }">
-                                <span x-text="day.dayNumber"></span>
+                                <span>{{ day.dayNumber }}</span>
                             </button>
                         </template>
                     </div>
@@ -81,7 +81,7 @@
         </div>
 
         <!-- No Slots Available -->
-        <div x-show="selectedDate && availableSlots.length === 0" class="flex items-center justify-center min-h-screen w-full">
+        <div v-show="selectedDate && availableSlots.length === 0" class="flex items-center justify-center min-h-screen w-full">
             <div class="text-center">
                 <div class="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg class="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -97,7 +97,7 @@
         </div>
 
         <!-- Time Slot Selection -->
-        <div x-show="selectedDate && availableSlots.length > 0 && !selectedSlot" class="flex items-center justify-center min-h-screen w-full">
+        <div v-show="selectedDate && availableSlots.length > 0 && !selectedSlot" class="flex items-center justify-center min-h-screen w-full">
             <div class="bg-gray-100 text-gray-900 rounded-xl shadow-lg w-[36rem] h-[36rem] max-w-[36rem] flex flex-col items-center justify-center p-10">
                 <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -107,18 +107,18 @@
                 <h2 class="text-2xl font-bold mb-2">Perfect! I found available times</h2>
                 <p class="text-gray-600 mb-6">Let me show you the best options</p>
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-4 w-full">
-                    <template x-for="slot in availableSlots" :key="slot.start_time">
+                                            <template v-for="slot in availableSlots" :key="slot.start_time">
                         <button 
                             @click="selectTimeSlotAndConfirm(slot)"
                             class="bg-white border-2 border-gray-200 rounded-xl py-4 px-2 hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 text-center group relative overflow-hidden"
                             :class="{ 'border-blue-500 bg-blue-100 shadow-xl': selectedSlot && selectedSlot.start_time === slot.start_time }"
                         >
                             <div class="relative z-10">
-                                <div class="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors" x-text="formatTime(slot.start_time)"></div>
-                                <div class="text-sm text-gray-500" x-text="formatTime(slot.end_time)"></div>
+                                                            <div class="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{{ formatTime(slot.start_time) }}</div>
+                            <div class="text-sm text-gray-500">{{ formatTime(slot.end_time) }}</div>
                                 <div class="mt-2 text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-1 inline-block">30 min</div>
                             </div>
-                            <div x-show="selectedSlot && selectedSlot.start_time === slot.start_time" class="absolute top-2 right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                            <div v-show="selectedSlot && selectedSlot.start_time === slot.start_time" class="absolute top-2 right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
                                 <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                                 </svg>
@@ -130,7 +130,7 @@
         </div>
 
         <!-- Booking Form -->
-        <div x-show="selectedSlot && !bookingSubmitted" class="flex items-center justify-center min-h-screen w-full">
+        <div v-show="selectedSlot && !bookingSubmitted" class="flex items-center justify-center min-h-screen w-full">
             <div class="max-w-2xl mx-auto p-6">
                 <div class="text-center mb-6">
                     <div class="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -153,11 +153,11 @@
                     <div class="text-sm text-gray-600 space-y-2">
                         <div class="flex justify-between">
                             <span class="font-medium">Date:</span>
-                            <span x-text="selectedDate ? selectedDate.toLocaleDateString() : ''"></span>
+                            <span>{{ selectedDate ? selectedDate.toLocaleDateString() : '' }}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="font-medium">Time:</span>
-                            <span x-text="selectedSlot ? formatTime(selectedSlot.start_time) + ' - ' + formatTime(selectedSlot.end_time) : ''"></span>
+                            <span>{{ selectedSlot ? formatTime(selectedSlot.start_time) + ' - ' + formatTime(selectedSlot.end_time) : '' }}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="font-medium">Duration:</span>
@@ -168,7 +168,7 @@
                 
                 <!-- Booking Form -->
                 <form @submit.prevent="submitBooking" class="space-y-4">
-                    <input type="hidden" name="slot_start_time" x-model="selectedSlot ? selectedSlot.start_time_utc : ''">
+                    <input type="hidden" name="slot_start_time" v-model="selectedSlot ? selectedSlot.start_time_utc : ''">
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -179,7 +179,7 @@
                                 required
                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm"
                                 placeholder="Enter your full name"
-                                x-model="guestName"
+                                v-model="guestName"
                             >
                         </div>
                         
@@ -191,7 +191,7 @@
                                 required
                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm"
                                 placeholder="Enter your email"
-                                x-model="guestEmail"
+                                v-model="guestEmail"
                             >
                         </div>
                     </div>
@@ -204,7 +204,7 @@
                             required
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm"
                             placeholder="What's this meeting about?"
-                            x-model="bookingTitle"
+                            v-model="bookingTitle"
                         >
                     </div>
                     
@@ -215,7 +215,7 @@
                             rows="3"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-sm"
                             placeholder="Any additional information you'd like to share..."
-                            x-model="guestMessage"
+                            v-model="guestMessage"
                         ></textarea>
                     </div>
                     
@@ -230,7 +230,7 @@
         </div>
 
         <!-- Success State -->
-        <div x-show="bookingSubmitted" class="flex items-center justify-center min-h-screen w-full">
+        <div v-show="bookingSubmitted" class="flex items-center justify-center min-h-screen w-full">
             <div class="text-center">
                 <div class="w-20 h-20 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
                     <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -251,11 +251,11 @@
                     <div class="text-sm text-gray-600 space-y-2">
                         <div class="flex justify-between">
                             <span class="font-medium">Date:</span>
-                            <span x-text="selectedDate ? selectedDate.toLocaleDateString() : ''"></span>
+                            <span>{{ selectedDate ? selectedDate.toLocaleDateString() : '' }}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="font-medium">Time:</span>
-                            <span x-text="selectedSlot ? formatTime(selectedSlot.start_time) + ' - ' + formatTime(selectedSlot.end_time) : ''"></span>
+                            <span>{{ selectedSlot ? formatTime(selectedSlot.start_time) + ' - ' + formatTime(selectedSlot.end_time) : '' }}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="font-medium">Duration:</span>
@@ -273,7 +273,10 @@
 </div>
 
 <script>
-    function bookingApp() {
+const { createApp } = Vue;
+
+createApp({
+    data() {
         return {
             currentDate: new Date(),
             selectedDate: null,
@@ -287,18 +290,22 @@
             bookingError: '',
             starting: false,
             bookingSubmitted: false,
-            userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            
-            get currentMonthText() {
-                return this.currentDate.toLocaleDateString('en-US', { 
-                    month: 'long', 
-                    year: 'numeric' 
-                });
-            },
-            
-            init() {
-                this.generateCalendar();
-            },
+            userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        }
+    },
+    
+    computed: {
+        currentMonthText() {
+            return this.currentDate.toLocaleDateString('en-US', { 
+                month: 'long', 
+                year: 'numeric' 
+            });
+        }
+    },
+    
+    mounted() {
+        this.generateCalendar();
+    },
             
             startBooking() {
                 this.starting = true;
@@ -342,8 +349,10 @@
             
             selectTimeSlotAndConfirm(slot) {
                 this.selectedSlot = slot;
-            },
-            
+            }
+        },
+        
+        methods: {
             resetBooking() {
                 this.selectedDate = null;
                 this.selectedSlot = null;
@@ -438,7 +447,7 @@
                     timeZone: this.userTimezone
                 });
             }
-        };
-    }
+        }
+    }).mount('#booking-app')
 </script>
 {% endblock %}

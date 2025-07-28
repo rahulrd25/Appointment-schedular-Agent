@@ -1,0 +1,79 @@
+<div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-auto">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-semibold text-gray-900">Booking Details</h3>
+                    <button hx-get="/bookings" hx-target="#booking-modal" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="flex justify-between">
+                        <span class="font-medium text-gray-700">Guest:</span>
+                        <span class="text-gray-900">{{ booking.guest_name }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="font-medium text-gray-700">Email:</span>
+                        <span class="text-gray-900 text-sm">{{ booking.guest_email }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="font-medium text-gray-700">Date:</span>
+                        <span class="text-gray-900 text-sm">{{ booking.start_time }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="font-medium text-gray-700">Time:</span>
+                        <span class="text-gray-900 text-sm">{{ booking.start_time.split(' at ')[1] }} - {{ booking.end_time }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="font-medium text-gray-700">Status:</span>
+                        <span class="px-2 py-1 text-xs font-medium rounded-full
+                            {% if booking.status == 'confirmed' %}
+                                bg-green-100 text-green-800
+                            {% elif booking.status == 'cancelled' %}
+                                bg-red-100 text-red-800
+                            {% elif booking.status == 'rescheduled' %}
+                                bg-yellow-100 text-yellow-800
+                            {% else %}
+                                bg-gray-100 text-gray-800
+                            {% endif %}">
+                            {{ booking.status|title }}
+                        </span>
+                    </div>
+                    {% if booking.guest_message %}
+                    <div class="mt-4 p-3 bg-gray-50 rounded-lg">
+                        <span class="font-medium text-gray-700 text-sm">Message:</span>
+                        <p class="text-gray-900 mt-1 text-sm">{{ booking.guest_message }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button hx-get="/bookings" hx-target="#booking-modal" class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                        Close
+                    </button>
+                    {% if booking.status == 'confirmed' %}
+                    <button hx-get="/bookings/api/{{ booking.id }}/reschedule-form" 
+                            hx-target="#booking-modal"
+                            class="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors">
+                        Reschedule
+                    </button>
+                    <button hx-get="/bookings/api/{{ booking.id }}/send-email-form" 
+                            hx-target="#booking-modal"
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        Send Email
+                    </button>
+                    <button hx-get="/bookings/api/{{ booking.id }}/cancel-confirmation" 
+                            hx-target="#booking-modal"
+                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                        Cancel
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div> 
