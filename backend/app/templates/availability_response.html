@@ -23,10 +23,10 @@
 <script>
     // Wait 1 second then refresh the availability card
     setTimeout(() => {
-        // Find the Alpine.js component and refresh dashboard data
-        const dashboardComponent = document.querySelector('[x-data*="dashboardApp"]').__x.$data;
-        if (dashboardComponent && dashboardComponent.loadDashboardData) {
-            dashboardComponent.loadDashboardData();
+        // Find the Vue.js component and refresh dashboard data
+        const dashboardApp = document.querySelector('#dashboard-app').__vue_app;
+        if (dashboardApp && dashboardApp._instance && dashboardApp._instance.proxy.loadDashboardData) {
+            dashboardApp._instance.proxy.loadDashboardData();
         }
     }, 1000);
 </script>

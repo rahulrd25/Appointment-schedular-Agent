@@ -295,7 +295,7 @@
     }
 </style>
 
-<div class="container" x-data="bookingApp()">
+<div id="booking-all-in-one-app" class="container">
     <!-- Left Panel -->
     <div class="left-panel">
         <div class="profile-img">{{ user.full_name.split()[0][:1].upper() + user.full_name.split()[-1][:1].upper() if user.full_name.split()|length > 1 else user.full_name[:2].upper() }}</div>
@@ -310,7 +310,7 @@
     <!-- Right Panel -->
     <div class="right-panel">
         <!-- Step 1: Date Selection -->
-        <div x-show="step === 1" x-transition>
+        <div v-show="step === 1">
             <div class="step-header">
                 <h2 class="step-title">Select a Date</h2>
                 <p class="step-subtitle">Choose a date that works for you</p>
@@ -321,7 +321,7 @@
                 <button @click="previousMonth()" style="background: #006bf3; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background-color 0.2s;" onmouseover="this.style.background='#0056cc'" onmouseout="this.style.background='#006bf3'">
                     ← Previous
                 </button>
-                <h3 style="font-size: 18px; font-weight: 600; color: #1a1a1a;" x-text="currentMonthText"></h3>
+                <h3 style="font-size: 18px; font-weight: 600; color: #1a1a1a;">{{ currentMonthText }}</h3>
                 <button @click="nextMonth()" style="background: #006bf3; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background-color 0.2s;" onmouseover="this.style.background='#0056cc'" onmouseout="this.style.background='#006bf3'">
                     Next →
                 </button>
@@ -338,7 +338,7 @@
                 <div class="calendar-header">Sat</div>
 
                 <!-- Calendar Days -->
-                <template x-for="(day, index) in calendarDays" :key="index">
+                <template v-for="(day, index) in calendarDays" :key="index">
                     <div 
                         class="calendar-day"
                         :class="{
@@ -346,30 +346,30 @@
                             'selected': day.isSelected,
                             'unavailable': !day.isAvailable || !day.isCurrentMonth
                         }"
-                        @click="selectDate(day)"
-                        x-text="day.dayNumber || ''">
+                        @click="selectDate(day)">
+                        {{ day.dayNumber || '' }}
                     </div>
                 </template>
             </div>
         </div>
 
         <!-- Step 2: Time Selection -->
-        <div x-show="step === 2" x-transition>
+        <div v-show="step === 2">
             <button class="btn back-btn" @click="step = 1">← Back</button>
             
             <div class="step-header">
                 <h2 class="step-title">Select a Time</h2>
-                <p class="step-subtitle" x-text="selectedDate ? formatDate(selectedDate) : 'Loading...'"></p>
+                <p class="step-subtitle">{{ selectedDate ? formatDate(selectedDate) : 'Loading...' }}</p>
             </div>
 
             <!-- Loading State -->
-            <div x-show="loadingSlots" style="text-align: center; padding: 40px;">
+            <div v-show="loadingSlots" style="text-align: center; padding: 40px;">
                 <div style="width: 50px; height: 50px; border: 3px solid #f3f3f3; border-top: 3px solid #006bf3; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
                 <p style="color: #666; font-size: 16px; font-weight: 500;">Loading available times...</p>
             </div>
 
             <!-- No Slots Available -->
-            <div x-show="!loadingSlots && availableTimes.length === 0" style="text-align: center; padding: 40px;">
+            <div v-show="!loadingSlots && availableTimes.length === 0" style="text-align: center; padding: 40px;">
                 <div style="width: 60px; height: 60px; background: #fef3c7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
                     <span style="font-size: 24px;">⚠️</span>
                 </div>
@@ -377,13 +377,13 @@
             </div>
 
             <!-- Time Slots -->
-            <div x-show="!loadingSlots && availableTimes.length > 0" class="time-slots">
-                <template x-for="time in availableTimes" :key="time.display">
+            <div v-show="!loadingSlots && availableTimes.length > 0" class="time-slots">
+                <template v-for="time in availableTimes" :key="time.display">
                     <div 
                         class="time-slot"
                         :class="{ 'selected': selectedTime && selectedTime.iso === time.iso }"
-                        @click="selectTime(time)"
-                        x-text="time.display">
+                        @click="selectTime(time)">
+                        {{ time.display }}
                     </div>
                 </template>
             </div>
@@ -392,7 +392,7 @@
         </div>
 
         <!-- Step 3: Booking Form -->
-        <div x-show="step === 3" x-transition>
+        <div v-show="step === 3">
             <button class="btn back-btn" @click="step = 2">← Back</button>
             
             <div class="step-header">
@@ -406,7 +406,7 @@
                     <input 
                         type="text" 
                         class="form-input" 
-                        x-model="bookingData.name" 
+                        v-model="bookingData.name" 
                         required>
                 </div>
 
@@ -415,7 +415,7 @@
                     <input 
                         type="email" 
                         class="form-input" 
-                        x-model="bookingData.email" 
+                        v-model="bookingData.email" 
                         required>
                 </div>
 
@@ -424,22 +424,22 @@
                     <input 
                         type="tel" 
                         class="form-input" 
-                        x-model="bookingData.phone">
+                        v-model="bookingData.phone">
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">Additional Notes</label>
                     <textarea 
                         class="form-input form-textarea" 
-                        x-model="bookingData.notes"
+                        v-model="bookingData.notes"
                         placeholder="Tell us what you'd like to discuss..."></textarea>
                 </div>
 
                 <!-- Error Message -->
-                <div x-show="bookingError" style="background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 14px;">
+                <div v-show="bookingError" style="background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 14px;">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="font-size: 16px;">⚠️</span>
-                        <span x-text="bookingError"></span>
+                        <span>{{ bookingError }}</span>
                     </div>
                 </div>
 
@@ -450,28 +450,28 @@
         </div>
 
         <!-- Step 4: Confirmation -->
-        <div x-show="step === 4" x-transition>
+        <div v-show="step === 4">
             <!-- Loader during processing -->
-            <div x-show="isSubmitting" style="text-align: center; padding: 40px 20px;">
+                          <div v-show="isSubmitting" style="text-align: center; padding: 40px 20px;">
                 <div style="width: 40px; height: 40px; border: 3px solid #e5e7eb; border-top: 3px solid #006bf3; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
                 <h3 style="margin: 0 0 10px 0; color: #1a1a1a; font-size: 18px; font-weight: 600;">Scheduling Meeting...</h3>
                 <p style="margin: 0; color: #666; font-size: 14px;">Please wait while we create your booking</p>
             </div>
             
             <!-- Confirmation message -->
-            <div x-show="!isSubmitting" class="confirmation">
+                          <div v-show="!isSubmitting" class="confirmation">
                 <div class="confirmation-icon">✓</div>
                 <h2>Meeting Scheduled!</h2>
                 <p>
-                    <strong x-text="formatDate(selectedDate) + ' at ' + selectedTime.display"></strong>
+                    <strong>{{ formatDate(selectedDate) + ' at ' + selectedTime.display }}</strong>
                 </p>
                 <p style="margin-top: 15px; color: #10b981; font-size: 14px;">
-                    ✅ Confirmation email sent to <strong x-text="bookingData.email"></strong>
+                    ✅ Confirmation email sent to <strong>{{ bookingData.email }}</strong>
                 </p>
                 
 
                 
-                <div x-show="bookingResult && bookingResult.google_event_url" style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <div v-show="bookingResult && bookingResult.google_event_url" style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin: 20px 0;">
                     <h3 style="margin-top: 0; color: #166534;">📅 Calendar Event</h3>
                     <p style="margin: 10px 0;">The meeting has been added to the calendar. You can view it here:</p>
                     <a :href="bookingResult.google_event_url" target="_blank" style="background: #10b981; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; display: inline-block; margin-top: 10px;">
@@ -490,7 +490,10 @@
 </div>
 
 <script>
-    function bookingApp() {
+const { createApp } = Vue;
+
+createApp({
+    data() {
         return {
             step: 1,
             currentMonth: new Date().getMonth(),
@@ -509,15 +512,19 @@
             
             calendarDays: [],
             availableTimes: [],
-            loadingSlots: false,
-
-            get currentMonthText() {
-                return new Date(this.currentYear, this.currentMonth).toLocaleString('default', { month: 'long', year: 'numeric' });
-            },
-
-            init() {
-                this.generateCalendar();
-            },
+            loadingSlots: false
+        }
+    },
+    
+    computed: {
+        currentMonthText() {
+            return new Date(this.currentYear, this.currentMonth).toLocaleString('default', { month: 'long', year: 'numeric' });
+        }
+    },
+    
+    mounted() {
+        this.generateCalendar();
+    },
 
             previousMonth() {
                 if (this.currentMonth === 0) {
@@ -729,6 +736,6 @@
                 }
             }
         }
-    }
+    }).mount('#booking-all-in-one-app')
 </script>
 {% endblock %} 
