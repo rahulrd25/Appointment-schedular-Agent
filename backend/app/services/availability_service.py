@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
@@ -121,8 +121,9 @@ def check_slot_availability(db: Session, slot_id: int) -> bool:
     if not slot or not slot.is_available:
         return False
     
-    # Check if slot is in the future
-    if slot.start_time <= datetime.utcnow():
+    # Check if slot is in the future - ensure timezone-naive comparison
+    slot_start_naive = slot.start_time.replace(tzinfo=None) if slot.start_time.tzinfo else slot.start_time
+    if slot_start_naive <= datetime.utcnow():
         return False
     
     # Check if slot is already booked
@@ -213,3 +214,127 @@ def sync_calendar_availability(db: Session, user: User) -> dict:
         }
     except Exception as e:
         return {"success": False, "message": f"Failed to connect to calendar: {str(e)}"}
+
+
+class AvailabilityService:
+    """Service class for availability operations"""
+    
+    def __init__(self, db: Session):
+        self.db = db
+    
+    def get_user_availability_slots(self, user_id: int, date: Optional[datetime] = None, duration_minutes: int = 30) -> List[Dict[str, Any]]:
+        """Get availability slots for a user, optionally filtered by date"""
+        slots = get_availability_slots_for_user(self.db, user_id)
+        
+        if date:
+            # Filter by date - ensure timezone-naive comparison
+            date_start = date.replace(hour=0, minute=0, second=0, microsecond=0)
+            date_end = date.replace(hour=23, minute=59, second=59, microsecond=999999)
+            
+            # Convert slots to timezone-naive for comparison
+            filtered_slots = []
+            for slot in slots:
+                # Make slot times timezone-naive for comparison
+                slot_start = slot.start_time.replace(tzinfo=None) if slot.start_time.tzinfo else slot.start_time
+                if date_start <= slot_start <= date_end:
+                    filtered_slots.append(slot)
+            slots = filtered_slots
+        
+        # Convert to dictionary format
+        result = []
+        for slot in slots:
+            # Ensure timezone-naive datetime for JSON serialization
+            start_time = slot.start_time.replace(tzinfo=None) if slot.start_time.tzinfo else slot.start_time
+            end_time = slot.end_time.replace(tzinfo=None) if slot.end_time.tzinfo else slot.end_time
+            
+            result.append({
+                "id": slot.id,
+                "start_time": start_time.isoformat(),
+                "end_time": end_time.isoformat(),
+                "duration_minutes": int((end_time - start_time).total_seconds() / 60),
+                "is_available": slot.is_available
+            })
+        
+        return result
+    
+    def check_slot_availability(self, user_id: int, start_time: datetime, end_time: datetime) -> bool:
+        """Check if a specific time slot is available for a user"""
+        # Check if there's an availability slot that covers this time
+        overlapping_slots = self.db.query(AvailabilitySlot).filter(
+            and_(
+                AvailabilitySlot.user_id == user_id,
+                AvailabilitySlot.is_available == True,
+                AvailabilitySlot.start_time <= start_time,
+                AvailabilitySlot.end_time >= end_time
+            )
+        ).all()
+        
+        if not overlapping_slots:
+            return False
+        
+        # Check if any of these slots are already booked
+        for slot in overlapping_slots:
+            existing_booking = self.db.query(Booking).filter(
+                and_(
+                    Booking.availability_slot_id == slot.id,
+                    Booking.status == "confirmed"
+                )
+            ).first()
+            
+            if existing_booking:
+                return False
+        
+        return True
+    
+    def create_booking_from_calendar(self, user_id: int, title: str, start_time: datetime, 
+                                   end_time: datetime, guest_email: str, guest_name: str,
+                                   description: str = None, google_event_id: str = None) -> Dict[str, Any]:
+        """Create a booking from calendar event"""
+        try:
+            # Create or find an availability slot
+            slot = self.db.query(AvailabilitySlot).filter(
+                and_(
+                    AvailabilitySlot.user_id == user_id,
+                    AvailabilitySlot.start_time <= start_time,
+                    AvailabilitySlot.end_time >= end_time,
+                    AvailabilitySlot.is_available == True
+                )
+            ).first()
+            
+            if not slot:
+                # Create a new availability slot
+                slot = AvailabilitySlot(
+                    user_id=user_id,
+                    start_time=start_time,
+                    end_time=end_time,
+                    is_available=True
+                )
+                self.db.add(slot)
+                self.db.flush()  # Get the ID without committing
+            
+            # Create the booking
+            booking = Booking(
+                host_user_id=user_id,
+                availability_slot_id=slot.id,
+                guest_name=guest_name,
+                guest_email=guest_email,
+                guest_message=description,
+                start_time=start_time,
+                end_time=end_time,
+                status="confirmed",
+                google_event_id=google_event_id
+            )
+            
+            self.db.add(booking)
+            self.db.commit()
+            self.db.refresh(booking)
+            
+            return {
+                "booking_id": booking.id,
+                "slot_id": slot.id,
+                "status": "success"
+            }
+            
+        except Exception as e:
+            self.db.rollback()
+            raise e
