@@ -1,0 +1,58 @@
+<label class="block text-sm font-medium text-gray-700 mb-2">Select New Time</label>
+
+{% if error %}
+<div class="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg">
+    <p class="text-xs text-red-600">{{ error }}</p>
+</div>
+{% endif %}
+
+{% if slots %}
+<div class="bg-gray-50 rounded-lg p-3">
+    <div class="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+        {% for slot in slots %}
+        <button 
+            type="button"
+            class="time-slot-btn p-2 text-xs border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 text-center bg-white"
+            hx-post="/bookings/api/{{ booking_id }}/select-time"
+            hx-vals='{"selected_time": "{{ slot.start_time.isoformat() }}", "selected_date": "{{ current_date }}"}'
+            hx-target="#time-slots"
+            hx-swap="innerHTML"
+
+        >
+            <div class="font-semibold text-gray-900 text-sm">{{ slot.start_time.strftime('%H:%M') }}</div>
+            <div class="text-gray-500 text-xs mt-1">{{ slot.end_time.strftime('%H:%M') }}</div>
+        </button>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Selected Time Display -->
+<div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+    <div class="flex items-center">
+        <svg class="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <span class="text-sm font-medium text-blue-800">Selected Time: {{ selected_time_display }}</span>
+    </div>
+</div>
+
+<!-- Update main form's hidden fields and button state -->
+<div id="form-updates" hx-swap-oob="true">
+    <input type="hidden" name="new_time" id="selected-time" value="{{ selected_time }}">
+    <input type="hidden" name="new_date" id="selected-date" value="{{ current_date }}">
+    <button type="submit" id="reschedule-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+        Reschedule
+    </button>
+</div>
+
+{% else %}
+<div class="bg-gray-50 rounded-lg p-4 text-center">
+    <div class="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-2">
+        <svg class="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+        </svg>
+    </div>
+    <p class="text-gray-600 text-xs">No available times for this date</p>
+    <p class="text-gray-500 text-xs mt-1">Try selecting a different date</p>
+</div>
+{% endif %} 
