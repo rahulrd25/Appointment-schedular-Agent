@@ -9,6 +9,7 @@ from fastapi.responses import RedirectResponse, HTMLResponse, PlainTextResponse
 from sqlalchemy.orm import Session
 import requests
 import json
+import pytz
 
 # Load environment variables from .env file if it exists
 env_file = Path(".env")
@@ -526,27 +527,23 @@ async def get_dashboard_upcoming_bookings(request: Request, db: Session = Depend
     access_token = request.cookies.get("access_token")
     if not access_token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    
     try:
         payload = verify_token(access_token)
         if not payload:
             raise HTTPException(status_code=401, detail="Invalid token")
-        
         user_email = payload.get("sub")
         user = get_user_by_email(db, user_email)
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
-        
         from app.services.booking_service import get_upcoming_bookings
         bookings = get_upcoming_bookings(db, user.id, limit=5)
-        
         return [
             {
                 "id": booking.id,
                 "guest_name": booking.guest_name,
                 "guest_email": booking.guest_email,
-                "start_time": booking.start_time.isoformat(),
-                "end_time": booking.end_time.isoformat(),
+                "start_time": booking.start_time.strftime('%B %d, %Y at %I:%M %p'),
+                "end_time": booking.end_time.strftime('%I:%M %p'),
                 "status": booking.status
             }
             for booking in bookings

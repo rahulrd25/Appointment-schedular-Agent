@@ -5,6 +5,7 @@ from sqlalchemy import Boolean, Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
+from app.core.hashing import verify_password
 
 class User(Base):
     __tablename__ = "users"
@@ -29,6 +30,12 @@ class User(Base):
     # Relationships
     availability_slots = relationship("AvailabilitySlot", back_populates="user", cascade="all, delete-orphan")
     bookings_as_host = relationship("Booking", foreign_keys="[Booking.host_user_id]", back_populates="host")
+    
+    def verify_password(self, plain_password: str) -> bool:
+        """Verify a password against the user's hashed password"""
+        if not self.hashed_password:
+            return False
+        return verify_password(plain_password, self.hashed_password)
 
 
 class AvailabilitySlot(Base):

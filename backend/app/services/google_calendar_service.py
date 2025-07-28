@@ -249,44 +249,59 @@ class GoogleCalendarService:
         location: Optional[str] = None
     ) -> Dict[str, Any]:
         """Update an existing calendar event."""
-        self._ensure_valid_credentials()
-        
-        service = build('calendar', 'v3', credentials=self.credentials)
-        
-        # Get the existing event
-        event = service.events().get(calendarId='primary', eventId=event_id).execute()
-        
-        # Update fields if provided
-        if title:
-            event['summary'] = title
-        if description:
-            event['description'] = description
-        if location:
-            event['location'] = location
-        if start_time:
-            # Ensure datetime object is timezone-aware
-            if start_time.tzinfo is None:
-                start_time = start_time.replace(tzinfo=timezone.utc)
-            event['start'] = {
-                'dateTime': start_time.isoformat(),
-                'timeZone': 'UTC',
-            }
-        if end_time:
-            # Ensure datetime object is timezone-aware
-            if end_time.tzinfo is None:
-                end_time = end_time.replace(tzinfo=timezone.utc)
-            event['end'] = {
-                'dateTime': end_time.isoformat(),
-                'timeZone': 'UTC',
-            }
-        
-        updated_event = service.events().update(
-            calendarId='primary', 
-            eventId=event_id, 
-            body=event,
-            sendUpdates='all'
-        ).execute()
-        return updated_event
+        try:
+            print(f"Updating event: {event_id}")
+            self._ensure_valid_credentials()
+            
+            service = build('calendar', 'v3', credentials=self.credentials)
+            
+            # Get the existing event
+            print(f"Getting existing event: {event_id}")
+            event = service.events().get(calendarId='primary', eventId=event_id).execute()
+            print(f"Retrieved existing event")
+            
+            # Update fields if provided
+            if title:
+                event['summary'] = title
+            if description:
+                event['description'] = description
+            if location:
+                event['location'] = location
+            if start_time:
+                # Ensure datetime object is timezone-aware
+                if start_time.tzinfo is None:
+                    start_time = start_time.replace(tzinfo=timezone.utc)
+                event['start'] = {
+                    'dateTime': start_time.isoformat(),
+                    'timeZone': 'UTC',
+                }
+                print(f"Updated start time: {start_time.isoformat()}")
+            if end_time:
+                # Ensure datetime object is timezone-aware
+                if end_time.tzinfo is None:
+                    end_time = end_time.replace(tzinfo=timezone.utc)
+                event['end'] = {
+                    'dateTime': end_time.isoformat(),
+                    'timeZone': 'UTC',
+                }
+                print(f"Updated end time: {end_time.isoformat()}")
+            
+            print(f"Updating event in calendar...")
+            updated_event = service.events().update(
+                calendarId='primary', 
+                eventId=event_id, 
+                body=event,
+                sendUpdates='all'
+            ).execute()
+            print(f"Successfully updated event: {event_id}")
+            return updated_event
+            
+        except Exception as e:
+            print(f"Error updating event {event_id}: {e}")
+            print(f"Error type: {type(e)}")
+            import traceback
+            print(f"Full traceback: {traceback.format_exc()}")
+            raise
 
     def delete_event(self, event_id: str) -> bool:
         """Delete a calendar event."""
@@ -302,10 +317,13 @@ class GoogleCalendarService:
     def get_event(self, event_id: str) -> Optional[Dict[str, Any]]:
         """Get a specific calendar event."""
         try:
+            print(f"Getting event: {event_id}")
             self._ensure_valid_credentials()
             service = build('calendar', 'v3', credentials=self.credentials)
             event = service.events().get(calendarId='primary', eventId=event_id).execute()
+            print(f"Successfully retrieved event: {event_id}")
             return event
         except Exception as e:
-            print(f"Error getting event: {e}")
+            print(f"Error getting event {event_id}: {e}")
+            print(f"Error type: {type(e)}")
             return None
