@@ -14,7 +14,7 @@
         <header class="bg-white shadow-sm border-b">
             <div class="flex items-center justify-between px-6 py-4">
                 <div>
-                    <h1 class="text-2xl font-semibold text-gray-900">Bookings Dashboard</h1>
+                    <h1 class="text-2xl font-semibold text-gray-900">Bookings</h1>
                     <p class="text-gray-600">Manage your appointments and meetings</p>
                 </div>
                 
@@ -36,58 +36,58 @@
         <main class="p-4">
             <!-- Stats Cards -->
             <div id="stats-container" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4" hx-get="/bookings/api/stats" hx-trigger="load">
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
                     <div class="flex items-center">
-                        <div class="p-2 bg-blue-100 rounded-lg">
-                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="p-6 rounded-full bg-blue-100">
+                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                             </svg>
                         </div>
                         <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-600">Total Bookings</p>
-                            <p class="text-2xl font-semibold text-gray-900">0</p>
+                            <p class="text-sm font-medium text-black">Total Bookings</p>
+                            <p class="text-2xl font-semibold text-black">0</p>
                         </div>
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
                     <div class="flex items-center">
-                        <div class="p-2 bg-green-100 rounded-lg">
-                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="p-6 rounded-full bg-green-100">
+                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
                         </div>
                         <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-600">Confirmed</p>
-                            <p class="text-2xl font-semibold text-gray-900">0</p>
+                            <p class="text-sm font-medium text-black">Confirmed</p>
+                            <p class="text-2xl font-semibold text-black">0</p>
                         </div>
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
                     <div class="flex items-center">
-                        <div class="p-2 bg-yellow-100 rounded-lg">
-                            <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="p-6 rounded-full bg-yellow-100">
+                            <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
                         </div>
                         <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-600">Upcoming</p>
-                            <p class="text-2xl font-semibold text-gray-900">0</p>
+                            <p class="text-sm font-medium text-black">Upcoming</p>
+                            <p class="text-2xl font-semibold text-black">0</p>
                         </div>
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
                     <div class="flex items-center">
-                        <div class="p-2 bg-red-100 rounded-lg">
-                            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="p-6 rounded-full bg-red-100">
+                            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
                         </div>
                         <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-600">Cancelled</p>
-                            <p class="text-2xl font-semibold text-gray-900">0</p>
+                            <p class="text-sm font-medium text-black">Cancelled</p>
+                            <p class="text-2xl font-semibold text-black">0</p>
                         </div>
                     </div>
                 </div>

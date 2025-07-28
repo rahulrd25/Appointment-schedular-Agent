@@ -145,11 +145,28 @@ async def create_public_booking(
         if not booking:
             raise HTTPException(status_code=400, detail="Unable to create booking. Slot may no longer be available.")
         
+        # Check if email was sent successfully
+        email_sent = False
+        try:
+            from app.services.email_service import send_booking_confirmation_email
+            send_booking_confirmation_email(
+                guest_email=guest_email,
+                guest_name=guest_name,
+                host_email=user.email,
+                host_name=user.full_name,
+                booking=booking
+            )
+            email_sent = True
+        except Exception as e:
+            print(f"Failed to send confirmation email: {e}")
+            email_sent = False
+        
         return JSONResponse({
             "success": True,
-            "message": "Booking confirmed successfully!",
+            "message": "Booking confirmed successfully!" if email_sent else "Booking created but email failed to send.",
             "booking_id": booking.id,
-            "google_event_url": f"https://calendar.google.com/calendar/event?eid={booking.google_event_id}" if booking.google_event_id else None
+            "google_event_url": f"https://calendar.google.com/calendar/event?eid={booking.google_event_id}" if booking.google_event_id else None,
+            "email_sent": email_sent
         })
         
     except ValueError as e:
