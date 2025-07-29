@@ -7,6 +7,7 @@ from app.core.database import get_db
 from app.services.intelligent_agent_service import IntelligentAgentService
 from app.api.deps import get_current_user_from_cookie
 from app.models.models import User
+from app.services.google_calendar_service import GoogleCalendarService
 
 router = APIRouter()
 
@@ -234,14 +235,38 @@ async def get_knowledge_summary(
     current_user: User = Depends(get_current_user_from_cookie)
 ):
     """
-    Get knowledge base summary
+    Get knowledge summary for the user
     """
     try:
         agent_service = IntelligentAgentService(db)
-        summary = agent_service.knowledge_base.get_knowledge_summary()
-        return summary
+        summary = agent_service.get_knowledge_summary(current_user.id)
+        return {"knowledge": summary}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting knowledge summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting knowledge: {str(e)}")
+
+@router.get("/calendar/events")
+async def get_calendar_events(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_from_cookie)
+):
+    """
+    Get calendar events for the agent dashboard
+    """
+    try:
+        if not current_user.google_access_token:
+            return {"events": []}
+        
+        service = GoogleCalendarService(
+            current_user.google_access_token, 
+            current_user.google_refresh_token,
+            db=db,
+            user_id=current_user.id
+        )
+        events = service.get_events()
+        return {"events": events}
+    except Exception as e:
+        # Return empty events if there's an error
+        return {"events": []}
 
 def get_user_stats(db: Session, user_id: int) -> Dict[str, Any]:
     """

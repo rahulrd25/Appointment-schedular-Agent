@@ -42,9 +42,11 @@ app = FastAPI(
 
 # Define agent routes early to avoid conflicts
 @app.get("/agent")
-async def agent_redirect():
-    """Redirect /agent to /agent/"""
-    return RedirectResponse(url="/agent/", status_code=302)
+async def agent_redirect(request: Request):
+    """Redirect /agent to /agent/ preserving query parameters"""
+    query_string = request.url.query
+    redirect_url = f"/agent/{'?' + query_string if query_string else ''}"
+    return RedirectResponse(url=redirect_url, status_code=302)
 
 @app.get("/agent/")
 async def agent_chat(request: Request, db: Session = Depends(get_db)):
@@ -142,17 +144,6 @@ async def google_auth_callback_api(
     is_calendar_connection = state == "calendar_connection"
     
     try:
-        if is_calendar_connection:
-            print("=== GOOGLE CALENDAR OAUTH CALLBACK STARTED ===")
-        else:
-            print("=== GOOGLE OAUTH CALLBACK STARTED ===")
-            
-        print("Received code:", code)
-        print("State:", state)
-        print("Using redirect_uri:", settings.GOOGLE_REDIRECT_URI)
-        print("Client ID:", settings.GOOGLE_CLIENT_ID)
-        print("Client Secret:", settings.GOOGLE_CLIENT_SECRET)
-        
         token_url = "https://oauth2.googleapis.com/token"
         token_data = {
             "code": code,
@@ -162,11 +153,8 @@ async def google_auth_callback_api(
             "grant_type": "authorization_code",
         }
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        print("Token data:", token_data)
         
         token_response = requests.post(token_url, data=token_data, headers=headers)
-        print("Token response status:", token_response.status_code)
-        print("Token response text:", token_response.text)
         token_response.raise_for_status()
         tokens = token_response.json()
         access_token = tokens.get("access_token")
@@ -179,13 +167,8 @@ async def google_auth_callback_api(
         # Get user info from Google
         user_info_url = "https://www.googleapis.com/oauth2/v2/userinfo"
         user_response = requests.get(user_info_url, headers={"Authorization": f"Bearer {access_token}"})
-        print("User info response status:", user_response.status_code)
-        print("User info response text:", user_response.text)
         user_response.raise_for_status()
         user_info = user_response.json()
-        
-        print("User info:", user_info)
-        print("Scopes granted:", scope)
         
         # Check if user exists
         user = get_user_by_email(db, user_info["email"])
@@ -195,12 +178,13 @@ async def google_auth_callback_api(
             calendar_email = user_info.get("email")
             calendar_name = user_info.get("name")
             
-            print(f"Calendar connection request for Google account: {calendar_email}")
-            print(f"Available scopes: {scope}")
+            # Debug: Log the actual scopes we received
+            print(f"DEBUG: Received scopes: {scope}")
+            print(f"DEBUG: Calendar email: {calendar_email}")
             
             # Check if calendar scope is present
             if "calendar" not in scope.lower():
-                print(f"ERROR: Calendar scope not found in: {scope}")
+                print(f"DEBUG: Calendar scope not found in: {scope}")
                 return RedirectResponse(url="/dashboard?calendar_error=no_calendar_scope", status_code=302)
             
             # Create a secure temporary storage for calendar connection data
@@ -224,16 +208,13 @@ async def google_auth_callback_api(
                 'scope': scope
             }
             
-            print(f"Stored calendar connection with ID: {connection_id}")
-            
             # Redirect to dashboard with connection ID
-            return RedirectResponse(url=f"/dashboard?calendar_connection_id={connection_id}", status_code=302)
+            return RedirectResponse(url=f"/agent?calendar_connection_id={connection_id}", status_code=302)
         
         else:
             # Regular signup flow
             if not user:
                 # Create new user
-                print("Creating new user...")
                 user_data = UserCreate(
                     email=user_info["email"],
                     password="",  # Google users don't need password
@@ -241,10 +222,8 @@ async def google_auth_callback_api(
                     google_id=user_info["id"]
                 )
                 user = create_user(db, user_data)
-                print("New user created:", user.email)
             else:
                 # Update existing user's Google ID and full name if not set
-                print("User exists, updating if needed...")
                 updated = False
                 if not user.google_id:
                     user.google_id = user_info["id"]
@@ -254,7 +233,6 @@ async def google_auth_callback_api(
                     updated = True
                 if updated:
                     db.commit()
-                    print("User updated")
             
             # Store basic Google credentials (but don't mark calendar as connected)
             user.google_access_token = access_token
@@ -264,10 +242,9 @@ async def google_auth_callback_api(
             
             # Create access token for our app
             jwt_token = create_access_token(data={"sub": user.email})
-            print("JWT token created for user:", user.email)
             
-            # Redirect to dashboard with cookie
-            response = RedirectResponse(url="/dashboard", status_code=302)
+            # Redirect to agent page with cookie
+            response = RedirectResponse(url="/agent/", status_code=302)
             response.set_cookie(
                 key="access_token",
                 value=jwt_token,
@@ -276,14 +253,9 @@ async def google_auth_callback_api(
                 secure=False,
                 samesite="lax"
             )
-            print("Redirecting to dashboard...")
             return response
         
     except Exception as e:
-        print(f"=== GOOGLE OAUTH ERROR ===")
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
         error_url = "/dashboard?calendar_error=true" if is_calendar_connection else "/login?error=google_auth_failed"
         return RedirectResponse(url=error_url, status_code=302)
 
@@ -312,7 +284,7 @@ async def login_post(
         
         # Create response with redirect
         response = HTMLResponse(
-            '<div class="text-green-600 text-sm">Login successful! Redirecting...</div><script>setTimeout(() => window.location.href = "/dashboard", 1000);</script>'
+            '<div class="text-green-600 text-sm">Login successful! Redirecting...</div><script>setTimeout(() => window.location.href = "/agent/", 1000);</script>'
         )
         
         # Set HTTP-only cookie
@@ -367,9 +339,19 @@ async def register_post(
             from app.services.email_service import send_verification_email
             send_verification_email(user.email, user.verification_token)
         
-        return HTMLResponse(
-            '<div class="text-green-600 text-sm">Registration successful! Please check your email to verify your account.</div>'
+        # Automatically log in the user and redirect to agent page
+        from app.core.security import create_access_token
+        access_token = create_access_token(data={"sub": user.email})
+        response = RedirectResponse(url="/agent/", status_code=302)
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            max_age=1800,  # 30 minutes
+            secure=False,  # Set to True in production with HTTPS
+            samesite="lax"
         )
+        return response
         
     except Exception as e:
         return HTMLResponse(
@@ -399,39 +381,8 @@ async def logout():
 
 @app.get("/dashboard")
 async def dashboard(request: Request, db: Session = Depends(get_db)):
-    access_token = request.cookies.get("access_token")
-    print(f"Dashboard - Access token: {access_token}")
-
-    if not access_token:
-        print("No access token found")
-        return RedirectResponse(url="/login", status_code=302)
-
-    try:
-        payload = verify_token(access_token)
-        print(f"Token payload: {payload}")
-
-        if not payload:
-            print("Token verification failed")
-            return RedirectResponse(url="/login", status_code=302)
-
-        user_email = payload.get("sub")
-        print(f"User email from token: {user_email}")
-        user = get_user_by_email(db, user_email)
-        print(f"User from DB: {user}")
-
-        if not user:
-            print(f"User not found for email: {user_email}")
-            return RedirectResponse(url="/login", status_code=302)
-
-        print(f"User authenticated: {user.email}")
-        return templates.TemplateResponse("dashboard.html", {
-            "request": request,
-            "current_user": user
-        })
-
-    except Exception as e:
-        print(f"Dashboard error: {e}")
-        return RedirectResponse(url="/login", status_code=302)
+    # Dashboard is now hidden for users
+    raise HTTPException(status_code=404, detail="Not Found")
 
 @app.get("/")
 async def root(request: Request):
@@ -505,21 +456,17 @@ async def complete_calendar_connection(request: Request, connection_id: str = Fo
         # Clean up the temporary connection data
         del app.state.pending_calendar_connections[connection_id]
         
-        print(f"Calendar connected: {connection_data['calendar_email']} for user: {user.email}")
-        
         # Auto-sync calendar availability
         try:
             from app.services.availability_service import sync_calendar_availability
-            sync_result = sync_calendar_availability(db, user)
-            print(f"Auto-sync result: {sync_result}")
-        except Exception as sync_error:
-            print(f"Auto-sync failed: {sync_error}")
+            sync_calendar_availability(db, user)
+        except Exception:
             # Don't fail the connection if sync fails
+            pass
         
         return {"success": True, "calendar_email": connection_data['calendar_email']}
         
     except Exception as e:
-        print(f"Calendar connection error: {e}")
         raise HTTPException(status_code=400, detail="Calendar connection failed")
 
 @app.get("/dashboard/api/bookings/upcoming")
