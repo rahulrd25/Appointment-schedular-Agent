@@ -1,0 +1,37 @@
+{% macro feature_card(icon_svg, gradient_classes, title, description) %}
+  <div class="bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-gray-200/50 hover:shadow-xl transition-all duration-300 hover:scale-[1.02] group">
+    <div class="w-12 h-12 {{ gradient_classes }} rounded-xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+      {{ icon_svg|safe }}
+    </div>
+    <h3 class="text-xl font-bold text-gray-900 mb-3">{{ title }}</h3>
+    <p class="text-gray-600">{{ description }}</p>
+  </div>
+{% endmacro %}
+
+{% macro step_card(step_number, title, description) %}
+  <div class="text-center">
+    <div class="w-16 h-16 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-6 shadow-lg">{{ step_number }}</div>
+    <h3 class="text-xl font-bold text-gray-900 mb-3">{{ title }}</h3>
+    <p class="text-gray-600">{{ description }}</p>
+  </div>
+{% endmacro %}
+
+{% macro chat_bubble(alignment, bubble_classes, icon_svg, message_html, extra_classes="") %}
+  <div class="flex items-{{ 'end' if alignment == 'right' else 'start' }} gap-2 {{ 'justify-end' if alignment == 'right' else '' }} animate-fade-in-up mb-8 {{ extra_classes }}">
+    {% if alignment == 'left' %}
+      <div class="w-6 h-6 {{ bubble_classes['icon'] }} rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+        {{ icon_svg|safe }}
+      </div>
+      <div class="{{ bubble_classes['bubble'] }}">
+        {{ message_html|safe }}
+      </div>
+    {% else %}
+      <div class="{{ bubble_classes['bubble'] }}">
+        {{ message_html|safe }}
+      </div>
+      <div class="w-6 h-6 {{ bubble_classes['icon'] }} rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+        {{ icon_svg|safe }}
+      </div>
+    {% endif %}
+  </div>
+{% endmacro %} 

@@ -22,23 +22,36 @@ class GoogleCalendarService:
                 token_uri="https://oauth2.googleapis.com/token",
                 client_id=os.getenv("GOOGLE_CLIENT_ID"),
                 client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-                scopes=["https://www.googleapis.com/auth/calendar"],
+                scopes=[
+                    "https://www.googleapis.com/auth/calendar",
+                    "https://www.googleapis.com/auth/calendar.events",
+                    "https://www.googleapis.com/auth/calendar.readonly"
+                ],
             )
 
     def get_authorization_url(self):
         flow = InstalledAppFlow.from_client_secrets_file(
-            'client_secret.json', ["https://www.googleapis.com/auth/calendar"]
+            'client_secret.json', [
+                "https://www.googleapis.com/auth/calendar",
+                "https://www.googleapis.com/auth/calendar.events",
+                "https://www.googleapis.com/auth/calendar.readonly"
+            ]
         )
         flow.redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
         authorization_url, state = flow.authorization_url(
             access_type='offline',
-            include_granted_scopes='true'
+            include_granted_scopes='true',
+            prompt='consent'  # Force consent screen to ensure refresh token
         )
         return authorization_url, state
 
     def get_tokens_from_auth_code(self, auth_code: str):
         flow = InstalledAppFlow.from_client_secrets_file(
-            'client_secret.json', ["https://www.googleapis.com/auth/calendar"]
+            'client_secret.json', [
+                "https://www.googleapis.com/auth/calendar",
+                "https://www.googleapis.com/auth/calendar.events",
+                "https://www.googleapis.com/auth/calendar.readonly"
+            ]
         )
         flow.redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
         flow.fetch_token(code=auth_code)
@@ -49,45 +62,47 @@ class GoogleCalendarService:
         }
 
     def _ensure_valid_credentials(self):
-        """Ensure credentials are valid and refresh if needed. Updates database if tokens are refreshed."""
+        """Ensure credentials are valid and refresh if needed."""
         if not self.credentials:
             raise Exception("Google credentials not set.")
 
-        if not self.credentials.valid:
-            if self.credentials.expired and self.credentials.refresh_token:
-                try:
-                    self.credentials.refresh(Request())
-                    
-                    # Update database with new tokens if db and user_id are provided
-                    if self.db and self.user_id:
-                        from app.models.models import User
-                        user = self.db.query(User).filter(User.id == self.user_id).first()
-                        if user:
-                            user.google_access_token = self.credentials.token
-                            if self.credentials.refresh_token:
-                                user.google_refresh_token = self.credentials.refresh_token
-                            self.db.commit()
-                            print(f"Updated tokens for user {self.user_id}")
-                except Exception as e:
-                    print(f"Failed to refresh tokens: {e}")
-                    raise Exception("Failed to sync, please reconnect calendar")
-            else:
-                raise Exception("Google credentials expired and no refresh token available.")
+        # Use our TokenRefreshService for proper token refresh
+        if not self.db or not self.user_id:
+            raise Exception("Database and user_id required for token refresh")
+            
+        from app.services.token_refresh_service import TokenRefreshService
+        from app.models.models import User
+        
+        # Get user from database
+        user = self.db.query(User).filter(User.id == self.user_id).first()
+        if not user:
+            raise Exception("User not found")
+        
+        # Use token refresh service
+        token_service = TokenRefreshService(self.db)
+        result = token_service.ensure_valid_tokens(user)
+        
+        if result["success"]:
+            # Update credentials with new tokens
+            self.credentials = Credentials(
+                token=result["access_token"],
+                refresh_token=result["refresh_token"],
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=os.getenv("GOOGLE_CLIENT_ID"),
+                client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+                scopes=[
+                    "https://www.googleapis.com/auth/calendar",
+                    "https://www.googleapis.com/auth/calendar.events",
+                    "https://www.googleapis.com/auth/calendar.readonly"
+                ],
+            )
+        else:
+            raise Exception("Token refresh failed: " + result["message"])
 
     def _handle_google_api_error(self, error):
-        """Handle Google API errors with specific messages."""
-        error_message = str(error)
-        
-        if "403" in error_message and "insufficientPermissions" in error_message:
-            raise Exception("Your calendar access has been revoked. Please reconnect your Google Calendar in Settings.")
-        elif "403" in error_message:
-            raise Exception("Access to your calendar was denied. Please reconnect your Google Calendar in Settings.")
-        elif "401" in error_message:
-            raise Exception("Your calendar connection has expired. Please reconnect your Google Calendar in Settings.")
-        elif "400" in error_message:
-            raise Exception("There was an issue with your calendar connection. Please reconnect your Google Calendar in Settings.")
-        else:
-            raise Exception(f"Calendar error: {error_message}")
+        """Handle Google API errors."""
+        raise Exception("Calendar access failed")
+
 
     def get_events(self, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None):
         """Get events from the calendar, optionally filtered by date range."""
@@ -148,7 +163,7 @@ class GoogleCalendarService:
         
         return len(conflicting_events) == 0
 
-    def get_available_slots(self, date: datetime, duration_minutes: int = 30) -> list:
+    def get_available_slots(self, date, duration_minutes: int = 30) -> list:
         """Get available time slots for a given date."""
         self._ensure_valid_credentials()
         service = build('calendar', 'v3', credentials=self.credentials)
@@ -158,8 +173,12 @@ class GoogleCalendarService:
         end_hour = 17
         
         # Ensure date is timezone-aware (UTC)
-        if date.tzinfo is None:
-            date = date.replace(tzinfo=timezone.utc)
+        # Convert date to datetime if it's a date object
+        if hasattr(date, 'date'):  # It's a datetime object
+            if date.tzinfo is None:
+                date = date.replace(tzinfo=timezone.utc)
+        else:  # It's a date object, convert to datetime
+            date = datetime.combine(date, datetime.min.time()).replace(tzinfo=timezone.utc)
         
         # Create start and end times for the day (timezone-aware)
         day_start = date.replace(hour=start_hour, minute=0, second=0, microsecond=0)
@@ -379,40 +398,4 @@ class GoogleCalendarService:
             self._handle_google_api_error(e)
             return None
 
-    def check_permissions(self) -> dict:
-        """Check if the current tokens have the necessary permissions without requiring reconnection."""
-        try:
-            self._ensure_valid_credentials()
-            service = build('calendar', 'v3', credentials=self.credentials)
-            
-            # Try a simple API call to check permissions
-            calendar_list = service.calendarList().list().execute()
-            
-            return {
-                "success": True,
-                "message": "Calendar permissions verified successfully",
-                "calendars_found": len(calendar_list.get('items', []))
-            }
-        except Exception as e:
-            error_message = str(e)
-            if "403" in error_message and "insufficientPermissions" in error_message:
-                return {
-                    "success": False,
-                    "message": "Failed to sync, please reconnect calendar",
-                    "needs_reconnection": True,
-                    "error_type": "insufficient_permissions"
-                }
-            elif "403" in error_message:
-                return {
-                    "success": False,
-                    "message": "Access to your calendar was denied. Please reconnect your Google Calendar in Settings.",
-                    "needs_reconnection": True,
-                    "error_type": "access_denied"
-                }
-            else:
-                return {
-                    "success": False,
-                    "message": f"Calendar connection issue: {error_message}",
-                    "needs_reconnection": False,
-                    "error_type": "unknown"
-                }
+
