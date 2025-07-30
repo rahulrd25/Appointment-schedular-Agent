@@ -9,10 +9,10 @@ api_router.include_router(web_pages.router, tags=["web_pages"])
 # Note: web_auth router should NOT include Google OAuth routes anymore
 
 # API endpoints (with prefix)
-api_router.include_router(auth.router, prefix="/api/v1", tags=["auth"])
+api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(calendar.router, prefix="/api/v1", tags=["calendar"])
 api_router.include_router(users.router, prefix="/api/v1", tags=["users"])
 api_router.include_router(availability.router, prefix="/availability", tags=["availability"])
-api_router.include_router(bookings.router, prefix="/bookings", tags=["bookings"])
+# api_router.include_router(bookings.router, prefix="/bookings", tags=["bookings"])
 api_router.include_router(public.router, prefix="/public", tags=["public"])
 api_router.include_router(agent.router, prefix="/agent", tags=["agent"])

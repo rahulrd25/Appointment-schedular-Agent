@@ -97,154 +97,7 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 # Templates for HTML responses
 templates = Jinja2Templates(directory="app/templates")
 
-# Google OAuth routes
-@app.get("/auth/google/calendar")
-async def google_calendar_auth():
-    """Start Google Calendar OAuth flow with calendar permissions"""
-    if not settings.GOOGLE_CLIENT_ID:
-        raise HTTPException(status_code=500, detail="Google OAuth not configured")
-    
-    from app.services.oauth_service import get_oauth_service
-    oauth_service = get_oauth_service()
-    
-    # Get authorization URL with calendar scopes and state parameter
-    google_auth_url = oauth_service.get_authorization_url(
-        include_calendar_scopes=True, 
-        state="calendar_connection"
-    )
-    
-    return RedirectResponse(url=google_auth_url)
 
-
-
-
-
-@app.get("/auth/google")
-async def google_auth():
-    """Start Google OAuth flow with calendar permissions"""
-    if not settings.GOOGLE_CLIENT_ID:
-        raise HTTPException(status_code=500, detail="Google OAuth not configured")
-    
-    from app.services.oauth_service import get_oauth_service
-    oauth_service = get_oauth_service()
-    
-    # Get authorization URL with calendar scopes included
-    google_auth_url = oauth_service.get_authorization_url(include_calendar_scopes=True)
-    
-    return RedirectResponse(url=google_auth_url)
-
-@app.get("/api/v1/auth/google/callback")
-async def google_auth_callback_api(
-    code: str = Query(...),
-    state: str = Query(None),
-    db: Session = Depends(get_db)
-):
-    is_calendar_connection = state == "calendar_connection"
-    
-    try:
-        from app.services.oauth_service import get_oauth_service
-        oauth_service = get_oauth_service()
-        
-        # Exchange code for tokens
-        tokens = oauth_service.exchange_code_for_tokens(code)
-        access_token = tokens.get("access_token")
-        refresh_token = tokens.get("refresh_token")
-        scope = tokens.get("scope", "")
-        
-        if not access_token:
-            raise Exception("No access token in response")
-        
-        # Get user info from Google
-        user_info = oauth_service.get_user_info(access_token)
-        
-        # Check if user exists
-        user = get_user_by_email(db, user_info["email"])
-        
-        if is_calendar_connection:
-            # Calendar connection flow - allows connecting any Google account for calendar
-            calendar_email = user_info.get("email")
-            calendar_name = user_info.get("name")
-            
-            # Debug: Log the actual scopes we received
-            print(f"DEBUG: Received scopes: {scope}")
-            print(f"DEBUG: Calendar email: {calendar_email}")
-            
-            # Validate calendar scopes using OAuth service
-            if not oauth_service.validate_calendar_scopes(scope):
-                print(f"DEBUG: Calendar scope not found in: {scope}")
-                return RedirectResponse(url="/dashboard?calendar_error=no_calendar_scope", status_code=302)
-            
-            # Create a secure temporary storage for calendar connection data
-            # We'll use a simple approach: store in a temporary table or session
-            # For now, let's store the calendar connection data in a way that can be claimed by the logged-in user
-            
-            # Store calendar tokens temporarily with a unique identifier
-            import secrets
-            connection_id = secrets.token_urlsafe(32)
-            
-            # Store temporarily in a simple dict (in production, use Redis or database)
-            if not hasattr(app.state, 'pending_calendar_connections'):
-                app.state.pending_calendar_connections = {}
-            
-            app.state.pending_calendar_connections[connection_id] = {
-                'calendar_email': calendar_email,
-                'calendar_name': calendar_name,
-                'access_token': access_token,
-                'refresh_token': refresh_token,
-                'created_at': datetime.now(),
-                'scope': scope
-            }
-            
-            # Redirect to agent dashboard with connection ID
-            return RedirectResponse(url=f"/dashboard?calendar_connection_id={connection_id}", status_code=302)
-        
-        else:
-            # Regular signup flow
-            if not user:
-                # Create new user
-                user_data = UserCreate(
-                    email=user_info["email"],
-                    password="",  # Google users don't need password
-                    full_name=user_info.get("name", ""),
-                    google_id=user_info["id"]
-                )
-                user = create_user(db, user_data)
-            else:
-                # Update existing user's Google ID and full name if not set
-                updated = False
-                if not user.google_id:
-                    user.google_id = user_info["id"]
-                    updated = True
-                if not user.full_name and user_info.get("name"):
-                    user.full_name = user_info["name"]
-                    updated = True
-                if updated:
-                    db.commit()
-            
-            # Store basic Google credentials (but don't mark calendar as connected)
-            user.google_access_token = access_token
-            if refresh_token:
-                user.google_refresh_token = refresh_token
-            db.commit()
-            
-            # Create access token for our app
-            jwt_token = create_access_token(data={"sub": user.email})
-            
-            # Redirect to dashboard page with cookie
-            response = RedirectResponse(url="/dashboard", status_code=302)
-            response.set_cookie(
-                key="access_token",
-                value=jwt_token,
-                httponly=True,
-                max_age=1800,
-                secure=False,
-                samesite="lax"
-            )
-            return response
-        
-    except Exception as e:
-        error_url = "/dashboard?calendar_error=true" if is_calendar_connection else "/login?error=google_auth_failed"
-        return RedirectResponse(url=error_url, status_code=302)
 
 # Add web routes directly
 @app.get("/login")
@@ -403,56 +256,7 @@ async def settings_page(request: Request, db: Session = Depends(get_db)):
 
 # Dashboard data endpoints (session-based auth)
 
-# Calendar connection completion endpoint
-@app.post("/dashboard/api/calendar/connect")
-async def complete_calendar_connection(request: Request, connection_id: str = Form(...), db: Session = Depends(get_db)):
-    """Complete the calendar connection process"""
-    access_token = request.cookies.get("access_token")
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    try:
-        payload = verify_token(access_token)
-        if not payload:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        
-        user_email = payload.get("sub")
-        user = get_user_by_email(db, user_email)
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
-        
-        # Get the pending calendar connection
-        if not hasattr(app.state, 'pending_calendar_connections'):
-            raise HTTPException(status_code=404, detail="Calendar connection not found")
-        
-        connection_data = app.state.pending_calendar_connections.get(connection_id)
-        if not connection_data:
-            raise HTTPException(status_code=404, detail="Calendar connection not found or expired")
-        
-        # Update user with calendar credentials
-        user.google_access_token = connection_data['access_token']
-        user.google_refresh_token = connection_data['refresh_token']
-        user.google_calendar_connected = True
-        user.google_calendar_email = connection_data['calendar_email']
-        
-        db.commit()
-        print(f"Calendar connected for user {user.email}")
-        
-        # Clean up the temporary connection data
-        del app.state.pending_calendar_connections[connection_id]
-        
-        # Auto-sync calendar availability
-        try:
-            from app.services.availability_service import sync_calendar_availability
-            sync_calendar_availability(db, user)
-        except Exception:
-            # Don't fail the connection if sync fails
-            pass
-        
-        return {"success": True, "calendar_email": connection_data['calendar_email']}
-        
-    except Exception as e:
-        raise HTTPException(status_code=400, detail="Calendar connection failed")
+
 
 @app.get("/dashboard/api/bookings/upcoming")
 async def get_dashboard_upcoming_bookings(request: Request, db: Session = Depends(get_db)):
@@ -904,7 +708,9 @@ async def cancel_booking_endpoint(
                 
                 calendar_service = GoogleCalendarService(
                     access_token=user.google_access_token,
-                    refresh_token=user.google_refresh_token
+                    refresh_token=user.google_refresh_token,
+                    db=db,
+                    user_id=user.id
                 )
                 
                 print(f"  - Deleting event: {booking.google_event_id}")
@@ -1122,7 +928,9 @@ async def reschedule_booking_endpoint(
             
             calendar_service = GoogleCalendarService(
                 access_token=user.google_access_token,
-                refresh_token=user.google_refresh_token
+                refresh_token=user.google_refresh_token,
+                db=db,
+                user_id=user.id
             )
             
             if booking.google_event_id:
@@ -1797,7 +1605,9 @@ async def get_available_slots_for_date(
         from app.services.google_calendar_service import GoogleCalendarService
         calendar_service = GoogleCalendarService(
             access_token=user.google_access_token,
-            refresh_token=user.google_refresh_token
+            refresh_token=user.google_refresh_token,
+            db=db,
+            user_id=user.id
         )
         
         # Parse the date
@@ -1817,6 +1627,9 @@ async def get_available_slots_for_date(
     except Exception as e:
         print(f"Error getting available slots: {e}")
         return {"error": str(e)}
+
+
+
 
 @app.post("/api/v1/bookings/book-slot/{user_slug}/")
 async def book_slot_with_calendar(
@@ -1868,7 +1681,9 @@ async def book_slot_with_calendar(
         from app.services.google_calendar_service import GoogleCalendarService
         calendar_service = GoogleCalendarService(
             access_token=user.google_access_token,
-            refresh_token=user.google_refresh_token
+            refresh_token=user.google_refresh_token,
+            db=db,
+            user_id=user.id
         )
         
         # Try to create the event in Google Calendar
@@ -2500,62 +2315,44 @@ async def get_bookings_stats(request: Request, db: Session = Depends(get_db)):
         total_upcoming = upcoming_db + upcoming_calendar
         
         return HTMLResponse(f"""
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
-                    <div class="flex items-center">
-                        <div class="p-6 rounded-full bg-blue-100">
-                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                            </svg>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-black">Total Bookings</p>
-                            <p class="text-2xl font-semibold text-black">{total_bookings}</p>
-                        </div>
-                    </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
                 </div>
-                
-                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-                    <div class="flex items-center">
-                        <div class="p-6 rounded-full bg-green-100">
-                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-black">Confirmed</p>
-                            <p class="text-2xl font-semibold text-black">{total_confirmed}</p>
-                        </div>
-                    </div>
+                <div class="stat-title">Total Bookings</div>
+                <div class="stat-value">{total_bookings}</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
                 </div>
-                
-                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
-                    <div class="flex items-center">
-                        <div class="p-6 rounded-full bg-yellow-100">
-                            <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-black">Upcoming</p>
-                            <p class="text-2xl font-semibold text-black">{total_upcoming}</p>
-                        </div>
-                    </div>
+                <div class="stat-title">Confirmed</div>
+                <div class="stat-value">{total_confirmed}</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
                 </div>
-                
-                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
-                    <div class="flex items-center">
-                        <div class="p-6 rounded-full bg-red-100">
-                            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-black">Cancelled</p>
-                            <p class="text-2xl font-semibold text-black">{total_cancelled}</p>
-                        </div>
-                    </div>
+                <div class="stat-title">Upcoming</div>
+                <div class="stat-value">{total_upcoming}</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
                 </div>
+                <div class="stat-title">Cancelled</div>
+                <div class="stat-value">{total_cancelled}</div>
             </div>
         """)
         
@@ -2698,26 +2495,10 @@ async def get_bookings_list(request: Request, db: Session = Depends(get_db)):
         # Sort by date and time (newest first)
         filtered_bookings.sort(key=lambda x: (x['date'], x['time']), reverse=True)
         
-        # Generate HTML for bookings list
+        # Prepare data for template
+        all_bookings_for_template = []
         if filtered_bookings:
-            bookings_html = ""
             for booking in filtered_bookings:
-                # Determine status badge
-                status_badge = ""
-                if booking['status'] == "confirmed":
-                    status_badge = '<span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Confirmed</span>'
-                elif booking['status'] == "cancelled":
-                    status_badge = '<span class="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">Cancelled</span>'
-                elif booking['status'] == "rescheduled":
-                    status_badge = '<span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">Rescheduled</span>'
-                
-                # Determine source badge
-                source_badge = ""
-                if booking['source'] == "calendar":
-                    source_badge = '<span class="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full ml-2">Calendar</span>'
-                else:
-                    source_badge = '<span class="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full ml-2">Database</span>'
-                
                 # Format date for display
                 display_date = booking['date']
                 today = datetime.now().date()
@@ -2732,40 +2513,27 @@ async def get_bookings_list(request: Request, db: Session = Depends(get_db)):
                 else:
                     display_date = booking_date.strftime('%b %d')
                 
-                bookings_html += f"""
-                    <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                        <div class="flex justify-between items-start">
-                            <div class="flex-1">
-                                <div class="flex items-center space-x-2 mb-2">
-                                    <h3 class="text-lg font-semibold text-gray-900">{booking['title']}</h3>
-                                    {status_badge}
-                                    {source_badge}
-                                </div>
-                                <p class="text-sm text-gray-600 mb-1">{display_date} at {booking['time']} - {booking['end_time']}</p>
-                                <p class="text-sm text-gray-500">{booking['email']}</p>
-                                {f'<p class="text-sm text-gray-400 mt-1">{booking["location"]}</p>' if booking.get('location') else ''}
-                                {f'<p class="text-sm text-gray-400 mt-1">{booking["guest_message"]}</p>' if booking.get('guest_message') else ''}
-                            </div>
-                            <div class="flex space-x-2">
-                                {f'<button onclick="viewBookingDetails({booking["id"]})" class="text-blue-600 hover:text-blue-800 text-sm font-medium">View</button>' if booking['source'] == 'database' else ''}
-                                {f'<button onclick="rescheduleBooking({booking["id"]})" class="text-yellow-600 hover:text-yellow-800 text-sm font-medium">Reschedule</button>' if booking['source'] == 'database' else ''}
-                                {f'<button onclick="cancelBooking({booking["id"]})" class="text-red-600 hover:text-red-800 text-sm font-medium">Cancel</button>' if booking['source'] == 'database' else ''}
-                            </div>
-                        </div>
-                    </div>
-                """
-        else:
-            bookings_html = """
-                <div class="text-center py-8">
-                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                    </svg>
-                    <h3 class="mt-2 text-sm font-medium text-gray-900">No bookings found</h3>
-                    <p class="mt-1 text-sm text-gray-500">No bookings match your current filters.</p>
-                </div>
-            """
+                # Convert booking data to template format
+                booking_data = {
+                    'id': booking['id'],
+                    'guest_name': booking['title'],
+                    'guest_email': booking['email'],
+                    'start_time': f"{display_date} at {booking['time']}",
+                    'end_time': booking['end_time'],
+                    'status': booking['status'],
+                    'guest_message': booking.get('guest_message', ''),
+                    'source': booking['source']
+                }
+                all_bookings_for_template.append(booking_data)
         
-        return HTMLResponse(bookings_html)
+        # Use template instead of generating HTML
+        from fastapi.templating import Jinja2Templates
+        templates = Jinja2Templates(directory="app/templates")
+        
+        return templates.TemplateResponse("bookings_list.html", {
+            "request": request,
+            "bookings": all_bookings_for_template
+        })
         
     except Exception as e:
         print(f"Error in get_bookings_list: {e}")

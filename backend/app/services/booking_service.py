@@ -53,7 +53,7 @@ def create_booking(
             if booking_data.guest_message:
                 event_description += f"\nMessage: {booking_data.guest_message}"
             
-            created_event = calendar_service.create_event(
+            created_event = calendar_service.create_booking_event(
                 title=event_title,
                 start_time=slot.start_time,
                 end_time=slot.end_time,

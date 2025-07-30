@@ -1,8 +1,9 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Any
 
 from app.core.config import settings
 from app.services.gmail_service import GmailService
+from app.services.token_refresh_service import get_token_refresh_service
 
 if TYPE_CHECKING:
     from app.models.models import Booking
@@ -47,15 +48,42 @@ def send_booking_confirmation_email(
     host_name: str,
     booking: "Booking",
     host_access_token: str = None,
-    host_refresh_token: str = None
+    host_refresh_token: str = None,
+    db: Optional[Any] = None
 ):
-    """Send booking confirmation emails using Gmail API."""
+    """Send booking confirmation emails using Gmail API with automatic token refresh."""
+    
+    # If we have a database session, try to refresh tokens automatically
+    if db:
+        try:
+            from app.services.token_refresh_service import get_token_refresh_service
+            token_service = get_token_refresh_service(db)
+            
+            # Get the host user
+            host_user = token_service.get_user_by_email(host_email)
+            if host_user:
+                # Ensure tokens are valid
+                token_status = token_service.ensure_valid_tokens(host_user)
+                if token_status["success"]:
+                    # Use the refreshed tokens
+                    host_access_token = token_status["access_token"]
+                    host_refresh_token = token_status["refresh_token"]
+                    print(f"✅ Tokens refreshed automatically for {host_email}")
+                else:
+                    print(f"⚠️  Token refresh failed for {host_email}: {token_status['message']}")
+                    if token_status.get("requires_reconnection"):
+                        print(f"   User {host_email} needs to reconnect Google Calendar")
+        except Exception as e:
+            print(f"Token refresh error: {e}")
     
     # Send confirmation to guest
-    send_guest_confirmation_email(guest_email, guest_name, host_name, booking, host_access_token, host_refresh_token)
+    guest_email_sent = send_guest_confirmation_email(guest_email, guest_name, host_name, booking, host_access_token, host_refresh_token)
     
     # Send notification to host
-    send_host_notification_email(host_email, host_name, guest_name, guest_email, booking, host_access_token, host_refresh_token)
+    host_email_sent = send_host_notification_email(host_email, host_name, guest_name, guest_email, booking, host_access_token, host_refresh_token)
+    
+    # Return success if at least one email was sent
+    return guest_email_sent or host_email_sent
 
 
 def send_guest_confirmation_email(
