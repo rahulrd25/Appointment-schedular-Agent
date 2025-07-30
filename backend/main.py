@@ -104,16 +104,15 @@ async def google_calendar_auth():
     if not settings.GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=500, detail="Google OAuth not configured")
     
-    google_auth_url = (
-        "https://accounts.google.com/o/oauth2/v2/auth?"
-        f"client_id={settings.GOOGLE_CLIENT_ID}&"
-        "response_type=code&"
-        "scope=openid email profile https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.send&"
-        f"redirect_uri={settings.GOOGLE_REDIRECT_URI}&"
-        "access_type=offline&"
-        "prompt=consent&"
-        "state=calendar_connection"
+    from app.services.oauth_service import get_oauth_service
+    oauth_service = get_oauth_service()
+    
+    # Get authorization URL with calendar scopes and state parameter
+    google_auth_url = oauth_service.get_authorization_url(
+        include_calendar_scopes=True, 
+        state="calendar_connection"
     )
+    
     return RedirectResponse(url=google_auth_url)
 
 
@@ -122,18 +121,15 @@ async def google_calendar_auth():
 
 @app.get("/auth/google")
 async def google_auth():
-    """Start Google OAuth flow"""
+    """Start Google OAuth flow with calendar permissions"""
     if not settings.GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=500, detail="Google OAuth not configured")
     
-    google_auth_url = (
-        "https://accounts.google.com/o/oauth2/v2/auth?"
-        f"client_id={settings.GOOGLE_CLIENT_ID}&"
-        "response_type=code&"
-        "scope=openid email profile&"
-        f"redirect_uri={settings.GOOGLE_REDIRECT_URI}&"
-        "access_type=offline"
-    )
+    from app.services.oauth_service import get_oauth_service
+    oauth_service = get_oauth_service()
+    
+    # Get authorization URL with calendar scopes included
+    google_auth_url = oauth_service.get_authorization_url(include_calendar_scopes=True)
     
     return RedirectResponse(url=google_auth_url)
 
@@ -146,19 +142,11 @@ async def google_auth_callback_api(
     is_calendar_connection = state == "calendar_connection"
     
     try:
-        token_url = "https://oauth2.googleapis.com/token"
-        token_data = {
-            "code": code,
-            "client_id": settings.GOOGLE_CLIENT_ID,
-            "client_secret": settings.GOOGLE_CLIENT_SECRET,
-            "redirect_uri": settings.GOOGLE_REDIRECT_URI,
-            "grant_type": "authorization_code",
-        }
-        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        from app.services.oauth_service import get_oauth_service
+        oauth_service = get_oauth_service()
         
-        token_response = requests.post(token_url, data=token_data, headers=headers)
-        token_response.raise_for_status()
-        tokens = token_response.json()
+        # Exchange code for tokens
+        tokens = oauth_service.exchange_code_for_tokens(code)
         access_token = tokens.get("access_token")
         refresh_token = tokens.get("refresh_token")
         scope = tokens.get("scope", "")
@@ -167,10 +155,7 @@ async def google_auth_callback_api(
             raise Exception("No access token in response")
         
         # Get user info from Google
-        user_info_url = "https://www.googleapis.com/oauth2/v2/userinfo"
-        user_response = requests.get(user_info_url, headers={"Authorization": f"Bearer {access_token}"})
-        user_response.raise_for_status()
-        user_info = user_response.json()
+        user_info = oauth_service.get_user_info(access_token)
         
         # Check if user exists
         user = get_user_by_email(db, user_info["email"])
@@ -184,8 +169,8 @@ async def google_auth_callback_api(
             print(f"DEBUG: Received scopes: {scope}")
             print(f"DEBUG: Calendar email: {calendar_email}")
             
-            # Check if calendar scope is present
-            if "calendar" not in scope.lower():
+            # Validate calendar scopes using OAuth service
+            if not oauth_service.validate_calendar_scopes(scope):
                 print(f"DEBUG: Calendar scope not found in: {scope}")
                 return RedirectResponse(url="/dashboard?calendar_error=no_calendar_scope", status_code=302)
             
@@ -2388,9 +2373,8 @@ async def get_bookings_data(request: Request, db: Session = Depends(get_db)):
                 )
                 
                 # Get events from past 30 days to next 30 days
-                start_date = datetime.now() - timedelta(days=30)
-                end_date = datetime.now() + timedelta(days=30)
-                
+                start_date = datetime.now(timezone.utc) - timedelta(days=30)
+                end_date = datetime.now(timezone.utc) + timedelta(days=30)
                 calendar_events = calendar_service.get_events(start_date, end_date)
                 
                 # Process calendar events
@@ -2473,7 +2457,7 @@ async def get_bookings_stats(request: Request, db: Session = Depends(get_db)):
         total_db = len(db_bookings)
         confirmed_db = len([b for b in db_bookings if b.status == "confirmed"])
         cancelled_db = len([b for b in db_bookings if b.status == "cancelled"])
-        upcoming_db = len([b for b in db_bookings if b.start_time > datetime.now()])
+        upcoming_db = len([b for b in db_bookings if b.start_time > datetime.now(timezone.utc)])
         
         # Get calendar events if connected
         calendar_events = []
@@ -2488,8 +2472,8 @@ async def get_bookings_stats(request: Request, db: Session = Depends(get_db)):
                 )
                 
                 # Get events from past 30 days to next 30 days
-                start_date = datetime.now() - timedelta(days=30)
-                end_date = datetime.now() + timedelta(days=30)
+                start_date = datetime.now(timezone.utc) - timedelta(days=30)
+                end_date = datetime.now(timezone.utc) + timedelta(days=30)
                 calendar_events = calendar_service.get_events(start_date, end_date)
                 
             except Exception as e:
@@ -2506,7 +2490,7 @@ async def get_bookings_stats(request: Request, db: Session = Depends(get_db)):
                 else:
                     event_datetime = datetime.fromisoformat(event_start)
                 
-                if event_datetime > datetime.now():
+                if event_datetime > datetime.now(timezone.utc):
                     upcoming_calendar += 1
         
         # Combine totals
@@ -2634,8 +2618,8 @@ async def get_bookings_list(request: Request, db: Session = Depends(get_db)):
                 )
                 
                 # Get events from past 30 days to next 30 days
-                start_date = datetime.now() - timedelta(days=30)
-                end_date = datetime.now() + timedelta(days=30)
+                start_date = datetime.now(timezone.utc) - timedelta(days=30)
+                end_date = datetime.now(timezone.utc) + timedelta(days=30)
                 calendar_events = calendar_service.get_events(start_date, end_date)
                 
                 # Process calendar events

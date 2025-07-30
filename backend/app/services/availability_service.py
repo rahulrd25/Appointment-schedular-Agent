@@ -19,6 +19,50 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
         # Check Google Calendar conditions first before creating anything
         if user.google_calendar_connected and user.google_access_token and user.google_refresh_token:
             try:
+                # Ensure tokens are valid using token refresh service
+                from app.services.token_refresh_service import get_token_refresh_service
+                token_service = get_token_refresh_service(db)
+                
+                # Ensure tokens are valid
+                token_status = token_service.ensure_valid_tokens(user)
+                if token_status["success"]:
+                    # Use the refreshed tokens
+                    user.google_access_token = token_status["access_token"]
+                    user.google_refresh_token = token_status["refresh_token"]
+                    print(f"✅ Tokens refreshed automatically for {user.email}")
+                else:
+                    print(f"⚠️  Token refresh failed for {user.email}: {token_status['message']}")
+                    if token_status.get("requires_reconnection"):
+                        print(f"   User {user.email} needs to reconnect Google Calendar")
+                        return {
+                            "success": False,
+                            "message": "Couldn't add slot. Please reconnect your calendar in Settings.",
+                            "slot": None,
+                            "calendar_created": False,
+                            "calendar_error": "Token refresh failed",
+                            "google_event_id": None
+                        }
+                
+                # Test calendar access directly using OAuth service
+                from app.services.oauth_service import get_oauth_service
+                oauth_service = get_oauth_service()
+                
+                # Test if we can access user info (basic token validation)
+                try:
+                    user_info = oauth_service.get_user_info(user.google_access_token)
+                    print(f"✅ Token validation successful for {user.email}")
+                except Exception as token_error:
+                    print(f"⚠️  Token validation failed: {token_error}")
+                    return {
+                        "success": False,
+                        "message": "Couldn't add slot. Please reconnect your calendar in Settings.",
+                        "slot": None,
+                        "calendar_created": False,
+                        "calendar_error": "Invalid tokens",
+                        "google_event_id": None
+                    }
+                
+                # Now create calendar service with refreshed tokens
                 from app.services.google_calendar_service import GoogleCalendarService
                 calendar_service = GoogleCalendarService(
                     access_token=user.google_access_token,
@@ -29,6 +73,7 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
                 
                 # Test calendar connection first
                 calendar_service.get_events()
+                print(f"✅ Calendar connection test successful for {user.email}")
                 
             except Exception as e:
                 print(f"Calendar connection test failed: {e}")
@@ -257,9 +302,8 @@ def check_slot_availability(db: Session, slot_id: int) -> bool:
     if not slot or not slot.is_available:
         return False
     
-    # Check if slot is in the future - ensure timezone-naive comparison
-    slot_start_naive = slot.start_time.replace(tzinfo=None) if slot.start_time.tzinfo else slot.start_time
-    if slot_start_naive <= datetime.utcnow():
+    # Check if slot is in the future - ensure timezone-aware comparison
+    if slot.start_time <= datetime.now(timezone.utc):
         return False
     
     # Check if slot is already booked
@@ -331,115 +375,19 @@ def create_availability_slots_from_calendar(db: Session, user: User, start_date:
     return created_slots
 
 
-def refresh_google_tokens(db: Session, user: User) -> dict:
-    """Proactively refresh Google Calendar tokens and check permissions."""
+def check_calendar_connection(db: Session, user: User) -> dict:
+    """Simple check if calendar is connected - no token refresh."""
     if not user.google_calendar_connected:
         return {"success": False, "message": "Google Calendar not connected"}
     
-    try:
-        from app.services.google_calendar_service import GoogleCalendarService
-        calendar_service = GoogleCalendarService(
-            access_token=user.google_access_token,
-            refresh_token=user.google_refresh_token,
-            db=db,
-            user_id=user.id
-        )
-        
-        # First check permissions
-        permission_check = calendar_service.check_permissions()
-        if not permission_check["success"]:
-            return permission_check
-        
-        # If permissions are good, try to get events to trigger token refresh if needed
-        events = calendar_service.get_events()
-        
-        return {
-            "success": True,
-            "message": "Google Calendar tokens refreshed successfully",
-            "events_found": len(events)
-        }
-    except Exception as e:
-        error_message = str(e)
-        if "Failed to refresh Google tokens" in error_message or "Google credentials expired" in error_message:
-            return {
-                "success": False, 
-                "message": "Your calendar connection has expired. Please reconnect your Google Calendar in Settings.",
-                "needs_reconnection": True
-            }
-        else:
-            return {
-                "success": False, 
-                "message": f"Failed to refresh tokens: {error_message}",
-                "needs_reconnection": False
-            }
-
-
-def sync_calendar_availability(db: Session, user: User) -> dict:
-    """Initialize calendar sync with automatic token refresh and permission checking."""
-    if not user.google_calendar_connected:
-        return {"success": False, "message": "Google Calendar not connected"}
+    if not user.google_access_token:
+        return {"success": False, "message": "No access token available"}
     
-    try:
-        # Test the calendar connection by checking permissions first
-        from app.services.google_calendar_service import GoogleCalendarService
-        calendar_service = GoogleCalendarService(
-            access_token=user.google_access_token,
-            refresh_token=user.google_refresh_token,
-            db=db,
-            user_id=user.id
-        )
-        
-        # First check permissions
-        permission_check = calendar_service.check_permissions()
-        if not permission_check["success"]:
-            return permission_check
-        
-        # If permissions are good, try to get events
-        events = calendar_service.get_events()
-        
-        return {
-            "success": True,
-            "message": f"Calendar connected successfully! Found {len(events)} events in your calendar.",
-            "events_found": len(events)
-        }
-    except Exception as e:
-        error_message = str(e)
-        if "Failed to refresh Google tokens" in error_message:
-            return {
-                "success": False, 
-                "message": "Your calendar connection has expired. Please reconnect your Google Calendar in Settings.",
-                "needs_reconnection": True
-            }
-        elif "Google credentials expired" in error_message:
-            return {
-                "success": False, 
-                "message": "Your calendar connection has expired. Please reconnect your Google Calendar in Settings.",
-                "needs_reconnection": True
-            }
-        elif "calendar access has been revoked" in error_message:
-            return {
-                "success": False, 
-                "message": "Failed to sync, please reconnect calendar",
-                "needs_reconnection": True
-            }
-        elif "Access to your calendar was denied" in error_message:
-            return {
-                "success": False, 
-                "message": "Access to your calendar was denied. Please reconnect your Google Calendar in Settings.",
-                "needs_reconnection": True
-            }
-        elif "calendar connection has expired" in error_message:
-            return {
-                "success": False, 
-                "message": "Your calendar connection has expired. Please reconnect your Google Calendar in Settings.",
-                "needs_reconnection": True
-            }
-        else:
-            return {
-                "success": False, 
-                "message": f"Failed to connect to calendar: {error_message}",
-                "needs_reconnection": False
-            }
+    return {
+        "success": True,
+        "message": "Google Calendar connected",
+        "connected": True
+    }
 
 
 class AvailabilityService:

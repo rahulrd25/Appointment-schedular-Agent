@@ -572,13 +572,7 @@
                 <p style="margin-top: 15px; color: #10b981; font-size: 14px;">
                     ✅ Confirmation email sent to <strong v-text="bookingData.email"></strong>
                 </p>
-                <div v-if="bookingResult && bookingResult.google_event_url" style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                    <h3 style="margin-top: 0; color: #166534;">📅 Calendar Event</h3>
-                    <p style="margin: 10px 0;">The meeting has been added to the calendar. You can view it here:</p>
-                    <a :href="bookingResult.google_event_url" target="_blank" style="background: {{ user.theme_color or '#1e3c72' }}; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; display: inline-block; margin-top: 10px;">
-                        📅 View in Google Calendar
-                    </a>
-                </div>
+
             </div>
             
             <!-- Email Failed Message -->
