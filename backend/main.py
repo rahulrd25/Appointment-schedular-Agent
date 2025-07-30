@@ -633,6 +633,110 @@ async def add_bulk_availability_slots(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+@app.post("/dashboard/api/availability/quick")
+async def add_quick_availability_slots(
+    request: Request, 
+    db: Session = Depends(get_db)
+):
+    """Add quick availability slots from the quick selection interface"""
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        return {"success": False, "message": "Not authenticated"}
+    
+    try:
+        payload = verify_token(access_token)
+        if not payload:
+            return {"success": False, "message": "Invalid token"}
+        
+        user_email = payload.get("sub")
+        user = get_user_by_email(db, user_email)
+        if not user:
+            return {"success": False, "message": "User not found"}
+        
+        # Parse JSON body
+        body = await request.json()
+        slots_data = body.get("slots", [])
+        
+        if not slots_data:
+            return {"success": False, "message": "No slots provided"}
+        
+        from datetime import datetime, timedelta
+        from app.services.availability_service import create_availability_slot
+        from app.schemas.schemas import AvailabilitySlotCreate
+        
+        created_slots = []
+        failed_slots = []
+        
+        for slot_data in slots_data:
+            try:
+                # Parse date and time
+                date_str = slot_data.get("date")
+                time_str = slot_data.get("start_time")
+                period = slot_data.get("period", 30)
+                
+                if not date_str or not time_str:
+                    failed_slots.append(f"Invalid slot data: {slot_data}")
+                    continue
+                
+                # Create datetime objects
+                start_datetime = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+                end_datetime = start_datetime + timedelta(minutes=period)
+                
+                # Check if slot already exists
+                from app.services.availability_service import get_availability_slots_for_user
+                existing_slots = get_availability_slots_for_user(db, user.id)
+                
+                # Check for overlap
+                slot_exists = False
+                for existing_slot in existing_slots:
+                    if (existing_slot.start_time.date() == start_datetime.date() and
+                        existing_slot.start_time.time() == start_datetime.time()):
+                        slot_exists = True
+                        break
+                
+                if slot_exists:
+                    failed_slots.append(f"Slot already exists for {date_str} at {time_str}")
+                    continue
+                
+                # Create the slot
+                slot_create_data = AvailabilitySlotCreate(
+                    start_time=start_datetime,
+                    end_time=end_datetime,
+                    is_available=True
+                )
+                
+                slot_result = create_availability_slot(db, slot_create_data, user.id)
+                if slot_result["success"]:
+                    created_slots.append(slot_result["slot"])
+                else:
+                    failed_slots.append(slot_result["message"])
+                    
+            except Exception as e:
+                failed_slots.append(f"Error creating slot: {str(e)}")
+        
+        # Return response
+        if created_slots:
+            message = f"Successfully created {len(created_slots)} availability slots!"
+            if failed_slots:
+                message += f" Failed to create {len(failed_slots)} slots."
+            
+            return {
+                "success": True,
+                "message": message,
+                "slots_created": len(created_slots),
+                "slots_failed": len(failed_slots),
+                "failed_details": failed_slots
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"Failed to create any slots. {len(failed_slots)} errors occurred.",
+                "failed_details": failed_slots
+            }
+            
+    except Exception as e:
+        return {"success": False, "message": "Internal server error"}
+
 @app.post("/bookings/api/{booking_id}/cancel")
 async def cancel_booking_endpoint(
     booking_id: int,
@@ -1629,8 +1733,6 @@ async def get_available_slots_for_date(
         return {"error": str(e)}
 
 
-
-
 @app.post("/api/v1/bookings/book-slot/{user_slug}/")
 async def book_slot_with_calendar(
     user_slug: str,
@@ -2187,8 +2289,8 @@ async def get_bookings_data(request: Request, db: Session = Depends(get_db)):
                     user_id=user.id
                 )
                 
-                # Get events from past 30 days to next 30 days
-                start_date = datetime.now(timezone.utc) - timedelta(days=30)
+                # Get events from past 7 days to next 30 days (reduced range for performance)
+                start_date = datetime.now(timezone.utc) - timedelta(days=7)
                 end_date = datetime.now(timezone.utc) + timedelta(days=30)
                 calendar_events = calendar_service.get_events(start_date, end_date)
                 
