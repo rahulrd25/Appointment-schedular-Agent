@@ -43,7 +43,7 @@ async def login_post(
     
     access_token = create_access_token(data={"sub": user.email})
     response = HTMLResponse(
-        content='<div class="text-green-500">Login successful! Redirecting...</div><script>setTimeout(()=>window.location.href="/agent/", 1000);</script>'
+        content='<div class="text-green-500">Login successful! Redirecting...</div><script>setTimeout(()=>window.location.href="/dashboard", 1000);</script>'
     )
     response.set_cookie(
         key="access_token",
@@ -96,7 +96,7 @@ async def register_post(
     
     # Auto-login after registration
     access_token = create_access_token(data={"sub": user.email})
-    response = HTMLResponse('<div class="text-green-500">Registration successful! Redirecting...</div><script>setTimeout(()=>window.location.href="/agent/", 1000);</script>')
+    response = HTMLResponse('<div class="text-green-500">Registration successful! Redirecting...</div><script>setTimeout(()=>window.location.href="/dashboard", 1000);</script>')
     response.set_cookie(
         key="access_token",
         value=f"Bearer {access_token}",

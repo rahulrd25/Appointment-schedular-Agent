@@ -1,540 +1,980 @@
-{% extends "base.html" %}
-
-{% block content %}
-<div class="flex h-screen bg-gray-100">
-    <!-- Sidebar -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Assistant Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 3s ease-in-out infinite',
+                        'bounce-subtle': 'bounce-subtle 2s ease-in-out infinite',
+                        'slide-up': 'slide-up 0.3s ease-out',
+                        'fade-in': 'fade-in 0.5s ease-out',
+                        'typing': 'typing 1.5s steps(20) infinite'
+                    },
+                    keyframes: {
+                        'float': {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-10px)' }
+                        },
+                        'bounce-subtle': {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '25%': { transform: 'translateY(-2px)' },
+                            '75%': { transform: 'translateY(-1px)' }
+                        },
+                        'slide-up': {
+                            '0%': { transform: 'translateY(10px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0px)', opacity: '1' }
+                        },
+                        'fade-in': {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' }
+                        },
+                        'typing': {
+                            '0%, 50%': { opacity: '1' },
+                            '51%, 100%': { opacity: '0' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gradient-to-br from-[#1e3c72] via-[#2a5298] to-[#1e3c72] min-h-screen">
     {% set sidebar_active = 'dashboard' %}
-    {% include '_sidebar.html' %}
+    <!-- Background Effects -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-4 -right-4 w-96 h-96 bg-[#2a5298] rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-float"></div>
+        <div class="absolute -bottom-8 -left-4 w-96 h-96 bg-[#1e3c72] rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-float" style="animation-delay: 2s;"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#fafbfc] rounded-full mix-blend-multiply filter blur-xl opacity-30 animate-float" style="animation-delay: 4s;"></div>
+    </div>
 
-    <!-- Loading State -->
-    <div id="loading-state" class="flex-1 overflow-auto flex items-center justify-center">
-        <div class="text-center">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <h2 class="text-xl font-semibold mb-2">Loading Dashboard...</h2>
-            <p class="text-gray-600">Please wait while we load your data.</p>
+    <!-- Main Container -->
+    <div class="relative z-10 min-h-screen flex">
+        <!-- Sidebar -->
+        <div class="bg-white/80 backdrop-blur-lg border-r border-gray-200 w-64 flex-shrink-0 shadow-lg">
+            <div class="p-6">
+                <h2 class="text-xl font-bold text-gray-900">Booking Agent</h2>
+                <p class="text-gray-600 mt-1">AI-Powered Scheduling</p>
+            </div>
+            <nav class="mt-6">
+                <a href="/dashboard" class="flex items-center px-4 py-2 text-base rounded-lg {% if sidebar_active == 'dashboard' %}bg-[#1e3c72] text-white{% else %}text-gray-700 hover:bg-gray-100{% endif %} transition-colors">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                    Dashboard
+                </a>
+                <a href="/bookings" class="flex items-center px-4 py-2 text-base rounded-lg {% if sidebar_active == 'bookings' %}bg-[#1e3c72] text-white{% else %}text-gray-700 hover:bg-gray-100{% endif %} transition-colors">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    Bookings
+                </a>
+                <a href="/availability" class="flex items-center px-4 py-2 text-base rounded-lg {% if sidebar_active == 'availability' %}bg-[#1e3c72] text-white{% else %}text-gray-700 hover:bg-gray-100{% endif %} transition-colors">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Availability
+                </a>
+                <a href="/settings" class="flex items-center px-4 py-2 text-base rounded-lg {% if sidebar_active == 'settings' %}bg-[#1e3c72] text-white{% else %}text-gray-700 hover:bg-gray-100{% endif %} transition-colors">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    Settings
+                </a>
+            </nav>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col">
+            <!-- Header -->
+            <header class="bg-white/80 backdrop-blur-lg border-b border-gray-200 shadow-sm">
+                <div class="px-6">
+                    <div class="flex justify-between items-center py-4">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h1 class="text-xl font-bold text-gray-900">AI Assistant</h1>
+                                <p class="text-sm text-gray-600">Your intelligent scheduling companion</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center space-x-2 bg-green-100 px-3 py-1.5 rounded-full border border-green-200">
+                                <div class="w-2 h-2 rounded-full animate-pulse" style="background: {% if current_user.google_calendar_connected %}#22c55e{% else %}#f87171{% endif %};"></div>
+                                <span class="text-sm font-medium" style="color: {% if current_user.google_calendar_connected %}#15803d{% else %}#b91c1c{% endif %};">
+                                    {% if current_user.google_calendar_connected %}Connected{% else %}Disconnected{% endif %}
+                                </span>
+                            </div>
+                            
+                            {% if current_user.google_calendar_connected and current_user.scheduling_slug %}
+                            <button onclick="copyPublicLink()" class="flex items-center space-x-2 bg-blue-100 hover:bg-blue-200 px-3 py-1.5 rounded-full border border-blue-200 transition-colors text-blue-700 hover:text-blue-800 text-sm font-medium">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                                Copy Link
+                            </button>
+                            {% endif %}
+                            
+                            <button class="text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                        </button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+        <!-- Loading State -->
+        <div id="loading-state" class="flex items-center justify-center flex-1">
+            <div class="text-center">
+                <div class="relative">
+                    <div class="w-16 h-16 border-4 border-purple-400/30 border-t-purple-400 rounded-full animate-spin mx-auto mb-6"></div>
+                    <div class="absolute inset-0 w-16 h-16 border-4 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mx-auto" style="animation-direction: reverse; animation-duration: 1s;"></div>
+                </div>
+                <p class="text-white/80 text-lg font-medium">Initializing AI Assistant...</p>
+                <p class="text-white/60 text-sm mt-2">Setting up your personalized experience</p>
+            </div>
+        </div>
+
+
+
+        <!-- Main Dashboard -->
+        <div id="dashboard-state" class="hidden flex-1">
+            <div class="p-6">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
+                    
+                    <!-- AI Chat - Main Component (Larger on desktop) -->
+                    <div class="lg:col-span-8 order-1">
+                        <div class="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-200 h-[calc(100vh-140px)] flex flex-col overflow-hidden">
+                            <!-- Chat Header -->
+                            <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-4">
+                                        <div class="relative">
+                                            <div class="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+                                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                                </svg>
+                                            </div>
+                                            <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
+                                        </div>
+                                        <div>
+                                            <h2 class="text-xl font-bold text-gray-900">AI Assistant</h2>
+                                            <p class="text-sm text-gray-600">Your intelligent scheduling companion</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex items-center space-x-3">
+                                        <button onclick="toggleVoiceInput()" class="p-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-900" title="Voice Input" id="voice-btn">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+                                            </svg>
+                                        </button>
+                                        <button onclick="clearChat()" class="p-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-900" title="Clear Chat">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                            </svg>
+                                        </button>
+                                        <button onclick="exportChat()" class="p-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-900" title="Export Chat">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                            </svg>
+                                        </button>
+                                        <button onclick="refreshDashboard()" class="p-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-600 hover:text-gray-900" title="Refresh Data">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                            </svg>
+                                        </button>
+
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Chat Messages -->
+                            <div id="chat-messages" class="flex-1 overflow-y-auto p-6 space-y-4 scroll-smooth">
+                                <!-- Welcome Message -->
+                                <div class="flex justify-start animate-fade-in">
+                                    <div class="max-w-lg">
+                                        <div class="flex items-end space-x-2">
+                                            <div class="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                                </svg>
+                                            </div>
+                                            <div class="bg-gray-50 backdrop-blur-sm px-4 py-3 rounded-2xl rounded-bl-md border border-gray-200 shadow-lg">
+                                                <p class="text-gray-900 leading-relaxed">👋 Hello! I'm your AI scheduling assistant. I can help you:</p>
+                                                <ul class="mt-2 text-sm text-gray-700 space-y-1">
+                                                    <li>• Check your availability</li>
+                                                    <li>• Schedule new appointments</li>
+                                                    <li>• Manage existing bookings</li>
+                                                    <li>• Answer questions about your calendar</li>
+                                                </ul>
+                                                <p class="mt-2 text-gray-900">What would you like to do today?</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                </div>
+
+                <!-- Quick Actions -->
+                            <div class="px-6 py-2">
+                                <div class="flex flex-wrap gap-2" id="quick-actions">
+                                    <button onclick="sendQuickMessage('What meetings do I have today?')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm rounded-full transition-all duration-200 hover:scale-105 border border-indigo-200">
+                                        Today's Schedule
+                                    </button>
+                                    <button onclick="sendQuickMessage('Check my availability this week')" class="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 text-sm rounded-full transition-all duration-200 hover:scale-105 border border-purple-200">
+                                        Weekly Availability
+                                    </button>
+                                    <button onclick="sendQuickMessage('Show me upcoming appointments')" class="px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 text-sm rounded-full transition-all duration-200 hover:scale-105 border border-green-200">
+                                        Upcoming Events
+                                    </button>
+                                    <button onclick="sendQuickMessage('Schedule a new meeting')" class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm rounded-full transition-all duration-200 hover:scale-105 border border-blue-200">
+                                        New Meeting
+                                    </button>
+                                    <button onclick="sendQuickMessage('What\'s my calendar look like tomorrow?')" class="px-3 py-1.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 text-sm rounded-full transition-all duration-200 hover:scale-105 border border-yellow-200">
+                                        Tomorrow
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Chat Input -->
+                            <div class="p-6 border-t border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
+                                <form id="chat-form" class="flex gap-3 items-end">
+                                    <div class="flex-1 relative">
+                                        <textarea 
+                                            id="message-input" 
+                                            placeholder="Ask me anything about your schedule..." 
+                                            disabled 
+                                            rows="1"
+                                            class="w-full px-4 py-3 bg-white backdrop-blur-sm border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all text-gray-900 placeholder-gray-500 resize-none scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+                                            style="min-height: 48px; max-height: 120px;"
+                                        ></textarea>
+                                        <div id="typing-indicator" class="hidden absolute bottom-2 left-4 flex items-center space-x-1">
+                                            <div class="w-1 h-1 bg-white/60 rounded-full animate-typing"></div>
+                                            <div class="w-1 h-1 bg-white/60 rounded-full animate-typing" style="animation-delay: 0.2s;"></div>
+                                            <div class="w-1 h-1 bg-white/60 rounded-full animate-typing" style="animation-delay: 0.4s;"></div>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        type="submit" 
+                                        disabled 
+                                        class="bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 text-white p-3 rounded-2xl font-medium transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg"
+                                    >
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                                        </svg>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dashboard Stats & Info (Sidebar) -->
+                    <div class="lg:col-span-4 order-2 space-y-6">
+                        <!-- Quick Stats -->
+                        <div class="bg-white/90 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-200 p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                                <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 00-2-2z"></path>
+                                </svg>
+                                Quick Overview
+                            </h3>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div class="text-center p-3 bg-indigo-50 rounded-xl border border-indigo-100 hover:bg-indigo-100 transition-colors cursor-pointer" onclick="sendQuickMessage('Show me my upcoming appointments')">
+                                    <div class="text-2xl font-bold text-indigo-600 mb-1" id="upcoming-count">0</div>
+                                    <div class="text-xs text-gray-600">Upcoming</div>
+                                </div>
+                                <div class="text-center p-3 bg-purple-50 rounded-xl border border-purple-100 hover:bg-purple-100 transition-colors cursor-pointer" onclick="sendQuickMessage('Show me all my bookings')">
+                                    <div class="text-2xl font-bold text-purple-600 mb-1" id="total-bookings">0</div>
+                                    <div class="text-xs text-gray-600">Total</div>
+                                </div>
+                                <div class="text-center p-3 bg-green-50 rounded-xl border border-green-100 hover:bg-green-100 transition-colors cursor-pointer" onclick="sendQuickMessage('Show me my available time slots')">
+                                    <div class="text-2xl font-bold text-green-600 mb-1" id="available-slots">0</div>
+                                    <div class="text-xs text-gray-600">Available</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Upcoming Bookings -->
+                        <div class="bg-white/90 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+                            <div class="p-4 border-b border-gray-200 bg-gray-50">
+                                <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                                    <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    Next Up
+                                </h3>
+                            </div>
+                            
+                            <div class="p-4 max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+                                <div id="upcoming-bookings-list">
+                                    <div class="flex items-center justify-center py-8">
+                                        <div class="text-center">
+                                            <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                </svg>
+                                            </div>
+                                            <p class="text-gray-500 text-sm">Loading your schedule...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- AI Assistant Tips -->
+                        <div class="bg-gradient-to-br from-indigo-50 to-purple-50 backdrop-blur-xl rounded-2xl shadow-xl border border-indigo-200 p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                                <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                Pro Tips
+                            </h3>
+                            <div class="space-y-3 text-sm text-gray-700">
+                                <div class="flex items-start space-x-2">
+                                    <div class="w-2 h-2 bg-indigo-500 rounded-full mt-2 flex-shrink-0"></div>
+                                    <p>Try saying "Schedule a meeting with John next Tuesday at 2 PM"</p>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <div class="w-2 h-2 bg-purple-500 rounded-full mt-2 flex-shrink-0"></div>
+                                    <p>Ask "When am I free this week?" for availability</p>
+                                </div>
+                                <div class="flex items-start space-x-2">
+                                    <div class="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                                    <p>Use natural language - I understand context!</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+                    </div>
+
+        <!-- Error State -->
+        <div id="error-state" class="hidden flex-1 flex items-center justify-center p-4">
+            <div class="max-w-md w-full bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl p-8 text-center border border-white/20">
+                <div class="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <svg class="w-10 h-10 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <h2 class="text-2xl font-bold text-white mb-4">Oops! Something went wrong</h2>
+                <p class="text-white/80 mb-6" id="error-message">We encountered an unexpected error. Please try refreshing the page.</p>
+                <button onclick="location.reload()" class="bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 text-white px-6 py-3 rounded-2xl font-medium transition-all duration-300">
+                    Try Again
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- Main Content -->
-    <div id="dashboard-app" class="flex-1 overflow-auto hidden" :user-timezone="'{{ current_user.timezone or 'UTC' }}'">
-        <!-- Header -->
-        <header class="bg-white shadow-sm border-b">
-            <div class="flex items-center justify-between px-6 py-4">
-                <div>
-                    <h1 class="text-2xl font-semibold text-gray-900">Dashboard</h1>
-                    <p class="text-gray-600">Welcome back, <span class="font-bold">{{ current_user.full_name or current_user.email }}</span></p>
-                </div>
-                <div class="flex items-center space-x-4">
-                    <a href="/logout" class="text-black hover:text-gray-700">Logout</a>
-                </div>
-            </div>
-        </header>
+    <script>
+        // User journey state management
+        const UserJourney = {
+            LOADING: 'loading',
+            CHECKING_USER: 'checking_user',
+            DASHBOARD: 'dashboard',
+            ERROR: 'error'
+        };
 
-        <!-- Dashboard Content -->
-        <main class="p-6">
+        let currentState = UserJourney.LOADING;
+        let userData = null;
 
-
-
-            <!-- Success Message for Calendar Connection -->
-            <div v-show="showSuccessMessage" class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6" role="alert">
-                <div class="flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                    <strong class="font-bold">Success!</strong>
-                    <span class="ml-2">Your Google Calendar has been connected and synced successfully!</span>
-                    <button @click="showSuccessMessage = false" class="ml-auto text-green-700 hover:text-green-900">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Copy Link Notification -->
-            <div v-show="showCopyNotification" class="fixed top-0 right-0 mr-4 text-white px-4 py-3 rounded-lg shadow-lg z-[9999] flex items-center space-x-2" role="alert" style="right: 16px; top: 20px; background-color: #059669; position: fixed !important;">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-                <span class="font-medium">Link copied to clipboard!</span>
-            </div>
-            
-            <!-- Calendar Syncing Popup -->
-            <div v-show="showSyncingPopup" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div class="bg-white rounded-lg p-8 max-w-md mx-4 text-center">
-                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Syncing Your Calendar</h3>
-                    <p class="text-gray-600 mb-4">We're analyzing your Google Calendar to check for conflicts and create availability slots...</p>
-                    <div class="flex items-center justify-center space-x-2">
-                        <div class="w-2 h-2 bg-indigo-600 rounded-full animate-bounce"></div>
-                        <div class="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                        <div class="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                    </div>
-                </div>
-            </div>
-
-            
-
-            
-
-            
-            {% if not current_user.google_calendar_connected %}
-            <!-- Calendar Connection Required -->
-            <div class="bg-gradient-to-r from-amber-500 to-orange-600 rounded-lg p-6 mb-8 text-white">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h2 class="text-xl font-bold mb-2">📅 Connect Your Google Calendar</h2>
-                        <p class="text-amber-100">To enable booking, please connect your Google Calendar first</p>
-                        <p class="text-amber-200 text-sm mt-2">This allows us to create events and check your availability</p>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <a href="/auth/google/calendar" class="bg-white text-orange-600 px-6 py-3 rounded-lg font-bold hover:bg-gray-100 transition shadow-lg">
-                            Connect Google Calendar
-                        </a>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Disabled Features Notice -->
-            <div class="bg-gray-100 border border-gray-300 rounded-lg p-6 mb-8">
-                <div class="text-center text-gray-600">
-                    <svg class="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-                    </svg>
-                    <h3 class="text-lg font-semibold text-gray-700 mb-2">Features Locked</h3>
-                    <p class="text-gray-600 mb-4">Connect your Google Calendar to unlock:</p>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                        <div class="flex items-center justify-center p-3 bg-gray-50 rounded-lg">
-                            <svg class="w-5 h-5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-                            </svg>
-                            Public Booking Link
-                        </div>
-                        <div class="flex items-center justify-center p-3 bg-gray-50 rounded-lg">
-                            <svg class="w-5 h-5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            Availability Management
-                        </div>
-                        <div class="flex items-center justify-center p-3 bg-gray-50 rounded-lg">
-                            <svg class="w-5 h-5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                            </svg>
-                            Automatic Bookings
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% else %}
-            <!-- Your Booking Link (Only shown when calendar is connected) -->
-            <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg p-6 mb-4 text-white">
-                <div class="flex items-center justify-between">
-                                            <div class="flex flex-col">
-                            <h2 class="text-lg font-bold">✅ Your Booking Link is Ready!</h2>
-                            <p class="text-sm text-indigo-100">Share this link to let others book appointments with you</p>
-                            {% if current_user.google_calendar_email and current_user.google_calendar_email != current_user.email %}
-    
-                            {% endif %}
-                        </div>
-                    <div class="flex items-center space-x-4">
-                        {% if current_user.google_calendar_email %}
-                        <div class="flex flex-col min-w-0">
-                            <span class="text-white text-sm truncate">📅 Connected: {{ current_user.google_calendar_email }}</span>
-                            {% if current_user.google_calendar_email != current_user.email %}
-    
-                            {% endif %}
-                            <div class="flex items-center space-x-2 mt-1">
-                                <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                                <span class="text-xs text-white">Auto-syncing</span>
-                            </div>
-                        </div>
-                        {% endif %}
-                        <div class="flex items-center space-x-4">
-                            <button @click="copyBookingLink()" class="bg-white text-indigo-600 px-3 py-1 rounded-lg font-medium hover:bg-gray-100 transition">
-                                Copy Link
-                            </button>
-                            {% if current_user.google_calendar_email %}
-                            <button @click="disconnectCalendar()" class="bg-red-500 text-white px-3 py-1 rounded-lg font-medium hover:bg-red-600 transition">
-                                Reconnect Calendar
-                            </button>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-
-            {% endif %}
-
-            <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div class="bg-white rounded-lg shadow p-3 border-l-4 border-blue-500">
-                    <div class="flex items-center">
-                        <div class="p-6 rounded-full bg-blue-100">
-                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                            </svg>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-black">Upcoming Bookings</p>
-                            <p class="text-2xl font-semibold text-black" v-if="stats && stats.upcomingCount !== undefined">{% raw %}{{ stats.upcomingCount }}{% endraw %}</p>
-                            <p class="text-2xl font-semibold text-black" v-else>Loading...</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-lg shadow p-3 border-l-4 border-green-500">
-                    <div class="flex items-center">
-                        <div class="p-6 rounded-full bg-green-100">
-                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-black">Total Bookings</p>
-                            <p class="text-2xl font-semibold text-black" v-if="stats && stats.totalBookings !== undefined">{% raw %}{{ stats.totalBookings }}{% endraw %}</p>
-                            <p class="text-2xl font-semibold text-black" v-else>Loading...</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-lg shadow p-3 border-l-4 border-yellow-500">
-                    <div class="flex items-center">
-                        <div class="p-6 rounded-full bg-yellow-100">
-                            <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-black">Available Slots</p>
-                            <p class="text-2xl font-semibold text-black" v-if="stats && stats.availableSlots !== undefined">{% raw %}{{ stats.availableSlots }}{% endraw %}</p>
-                            <p class="text-2xl font-semibold text-black" v-else>Loading...</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-lg shadow p-3 border-l-4 border-purple-500">
-                    <div class="flex items-center">
-                        <div class="p-6 rounded-full bg-purple-100">
-                            <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-                            </svg>
-                        </div>
-                        <div class="ml-4">
-                            <p class="text-sm font-medium text-black">Link Visits</p>
-                            <p class="text-lg font-semibold text-black">Coming Soon</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Main Cards -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Upcoming Bookings Card -->
-                <div class="bg-white rounded-lg shadow">
-                    <div class="p-6 border-b">
-                        <div class="flex items-center justify-between">
-                            <h3 class="text-lg font-semibold text-black">Upcoming Bookings</h3>
-                            <a href="/bookings" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium">View All</a>
-                        </div>
-                    </div>
-                    <div class="p-6">
-                        <div class="space-y-4">
-                            <!-- Show when no bookings -->
-                            <div v-show="upcomingBookings.length === 0" class="text-center text-gray-500 py-8">
-                                <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                </svg>
-                                <p>No upcoming bookings</p>
-                                <p class="text-sm mt-1">Share your booking link to get started!</p>
-                            </div>
-                            
-                            <!-- Show bookings -->
-                            <template v-for="booking in upcomingBookings.slice(0, 3)" :key="booking.id">
-                                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                    <div>
-                                        <p class="font-medium text-black">{% raw %}{{ booking.guest_name }}{% endraw %}</p>
-                                        <div class="flex items-center space-x-1">
-                                            <svg class="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                            </svg>
-                                            <span class="text-sm text-gray-600">{% raw %}{{ booking.start_time.split(' at ')[0] }}{% endraw %}</span>
-                                        </div>
-                                        <div class="flex items-center space-x-1">
-                                            <svg class="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                            </svg>
-                                            <span class="text-sm text-gray-600">{% raw %}{{ booking.start_time.split(' at ')[1] + ' - ' + booking.end_time }}{% endraw %}</span>
-                                        </div>
-                                                                                  <p class="text-xs text-gray-500">{% raw %}{{ booking.guest_email }}{% endraw %}</p>
-                                    </div>
-                                    <div class="text-right">
-                                        <span class="inline-block px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">{% raw %}{{ booking.status }}{% endraw %}</span>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Quick Actions Card -->
-                <div class="bg-white rounded-lg shadow">
-                    <div class="p-6 border-b">
-                        <h3 class="text-lg font-semibold text-black">Quick Actions</h3>
-                    </div>
-                    <div class="p-6">
-                        <div class="space-y-3">
-                            <a href="/availability" class="w-full flex items-center p-3 text-black bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                                <svg class="w-5 h-5 mr-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                                Manage Availability
-                            </a>
-                            <a href="/bookings" class="w-full flex items-center p-3 text-black bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                                <svg class="w-5 h-5 mr-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                </svg>
-                                View All Bookings
-                            </a>
-                            <button @click="copyBookingLink()" class="w-full flex items-center p-3 text-black bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                                <svg class="w-5 h-5 mr-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-                                </svg>
-                                Copy Booking Link
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
-        
-        <!-- Enhanced Add Availability Slot Modal -->
-        <!-- Modal removed as per user request -->
-    </div>
-</div>
-
-<script>
-try {
-    const { createApp } = Vue;
-
-    createApp({
-    data() {
-        return {
-            showModal: false,
-            showSuccessMessage: false,
-            showSyncingPopup: false,
-            showCopyNotification: false,
-            activeTab: 'single',
-            stats: {
-                upcomingCount: 'Loading...',
-                totalBookings: 'Loading...',
-                availableSlots: 'Loading...'
-            },
-            upcomingBookings: [],
-            userTimezone: ''
-        }
-    },
-    
-    async mounted() {
-        console.log('Vue.js component initializing...');
-        console.log('Initial stats:', this.stats);
-        
-        // Ensure stats is initialized
-        if (!this.stats) {
-            console.log('Stats not initialized, creating default...');
-            this.stats = {
-                upcomingCount: 'Loading...',
-                totalBookings: 'Loading...',
-                availableSlots: 'Loading...'
-            };
-        }
-        
-        // Show dashboard and hide loading state
-        document.getElementById('dashboard-app').classList.remove('hidden');
-        document.getElementById('loading-state').style.display = 'none';
-        
-        // Check for calendar connection callback
-        const urlParams = new URLSearchParams(window.location.search);
-        const connectionId = urlParams.get('calendar_connection_id');
-        const calendarConnected = urlParams.get('calendar_connected');
-        
-        if (connectionId) {
-            this.showSyncingPopup = true;
-            await this.handleCalendarConnection(connectionId);
-        } else {
-            await this.loadDashboardData();
-        }
-        
-        // Show success message if calendar was just connected
-        if (calendarConnected === 'true') {
-            this.showSyncingPopup = false;
-            this.showSuccessMessage = true;
-            // Auto-hide after 5 seconds
-            setTimeout(() => {
-                this.showSuccessMessage = false;
-            }, 5000);
-        }
-        
-        // Handle HTMX form submission success
-        this.$nextTick(() => {
-            console.log('Vue.js component initialized, showModal:', this.showModal);
-            
-            document.body.addEventListener('htmx:afterRequest', (event) => {
-                if (event.detail.target.id === 'slot-response' && event.detail.xhr.status === 200) {
-                    this.showModal = false;
-                    this.loadDashboardData();
-                    
-                    // Show success message
-                    const response = JSON.parse(event.detail.xhr.responseText);
-                    alert(response.message || 'Availability slots created successfully!');
-                }
-            });
-            
-            // Handle day selection checkboxes
-            document.addEventListener('change', (event) => {
-                if (event.target.name === 'days') {
-                    const label = event.target.closest('label');
-                    if (event.target.checked) {
-                        label.classList.add('bg-indigo-100', 'border-indigo-300');
-                    } else {
-                        label.classList.remove('bg-indigo-100', 'border-indigo-300');
-                    }
-                }
-            });
-        });
-    },
-    
-    methods: {
-        async loadDashboardData() {
+        // Check user status and show dashboard
+        async function checkUserStatus() {
             try {
-                console.log('Loading dashboard data...');
-                console.log('Stats before loading:', this.stats);
-                
-                // Load data in parallel
-                const [upcomingResponse, allBookingsResponse, slotsResponse] = await Promise.all([
-                    fetch('/dashboard/api/bookings/upcoming'),
-                    fetch('/dashboard/api/bookings/all'),
-                    fetch('/dashboard/api/availability/available')
-                ]);
-                
-                const upcomingBookings = await upcomingResponse.json();
-                const allBookings = await allBookingsResponse.json();
-                const availableSlots = await slotsResponse.json();
-                
-                console.log('Data loaded:', { upcomingBookings, allBookings, availableSlots });
-                
-                // Update stats
-                this.stats.upcomingCount = upcomingBookings.length;
-                this.stats.totalBookings = allBookings.length;
-                this.stats.availableSlots = availableSlots.length;
-                this.upcomingBookings = upcomingBookings;
-                
-                console.log('Stats after loading:', this.stats);
-                
-            } catch (error) {
-                console.error('Error loading dashboard data:', error);
-                this.stats = { upcomingCount: '0', totalBookings: '0', availableSlots: '0' };
-                this.upcomingBookings = [];
-            }
-        },
-        
-        formatDateTime(dateString) {
-            const date = new Date(dateString);
-            return `${date.toLocaleDateString('en-GB')} at ${date.toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit', hour12: false, timeZone: this.userTimezone})}`;
-        },
-        
-        copyBookingLink() {
-            const link = 'http://localhost:8000/{{ current_user.scheduling_slug or "your-link" }}';
-            
-            navigator.clipboard.writeText(link).then(() => {
-                // Show success notification
-                console.log('Setting showCopyNotification to true');
-                this.showCopyNotification = true;
-                console.log('showCopyNotification is now:', this.showCopyNotification);
-                
-                // Hide after exactly 2 seconds
-                setTimeout(() => {
-                    this.showCopyNotification = false;
-                    console.log('Hiding notification after 2 seconds');
-                }, 2000);
-            }).catch(() => {
-                // Fallback for older browsers
-                prompt('Copy this link:', link);
-            });
-        },
-        
-        disconnectCalendar() {
-            if (confirm('Are you sure you want to change your connected calendar? This will temporarily disable booking until you connect a new calendar.')) {
-                window.location.href = '/auth/google/calendar';
-            }
-        },
-        
-        async handleCalendarConnection(connectionId) {
-            try {
-                // Show loading state
-                document.querySelector('main').innerHTML = `
-                    <div class="flex items-center justify-center min-h-screen">
-                        <div class="text-center">
-                            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                            <h2 class="text-xl font-semibold mb-2">Connecting Your Calendar...</h2>
-                            <p class="text-gray-600">Please wait while we set up your Google Calendar integration.</p>
-                        </div>
-                    </div>
-                `;
-                
-                const formData = new FormData();
-                formData.append('connection_id', connectionId);
-                
-                const response = await fetch('/dashboard/api/calendar/connect', {
-                    method: 'POST',
-                    body: formData
+                const response = await fetch('/dashboard/api/user/status', {
+                    method: 'GET',
+                    credentials: 'include'
                 });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to check user status');
+                }
                 
                 const result = await response.json();
                 
-                if (response.ok && result.success) {
-                    // Success - redirect immediately to avoid error flash
-                    window.location.href = '/dashboard?calendar_connected=true';
+                if (result.user_exists) {
+                    // User exists - show dashboard
+                    showDashboard();
                 } else {
-                    throw new Error(result.detail || 'Connection failed');
+                    // User not authenticated - redirect to login
+                    window.location.href = '/login';
+                }
+            } catch (error) {
+                console.error('Error checking user status:', error);
+                showError('Failed to check user status. Please refresh the page.');
+            }
+        }
+
+        // Show dashboard state
+        function showDashboard() {
+            currentState = UserJourney.DASHBOARD;
+            
+            // Hide loading and show dashboard
+            document.getElementById('loading-state').style.display = 'none';
+            document.getElementById('dashboard-state').style.display = 'block';
+            
+            // Enable chat functionality
+            document.getElementById('message-input').disabled = false;
+            document.getElementById('message-input').placeholder = 'Ask me anything about your schedule...';
+            document.getElementById('chat-form').querySelector('button').disabled = false;
+            
+            // Load dashboard data
+            loadDashboardData();
+        }
+
+
+
+        // Show error state
+        function showError(message) {
+            currentState = UserJourney.ERROR;
+            
+            // Hide all states and show error
+            document.getElementById('loading-state').style.display = 'none';
+            document.getElementById('dashboard-state').style.display = 'none';
+            document.getElementById('error-state').style.display = 'block';
+            document.getElementById('error-message').textContent = message;
+        }
+
+
+
+        // Load dashboard data
+        async function loadDashboardData() {
+            try {
+                console.log('Loading dashboard data...');
+                const response = await fetch('/dashboard/api/data', {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load dashboard data');
                 }
                 
+                const data = await response.json();
+                console.log('Dashboard data loaded:', data);
+                
+
+                
+                updateDashboardUI(data);
             } catch (error) {
-                console.error('Calendar connection error:', error);
-                document.querySelector('main').innerHTML = `
-                    <div class="flex items-center justify-center min-h-screen">
-                        <div class="text-center">
-                            <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                console.error('Error loading dashboard data:', error);
+                // Show error state instead of sample data
+                const errorData = {
+                    upcomingBookings: [],
+                    allBookings: [],
+                    availableSlots: [],
+                    calendarConnected: false,
+                    error: error.message
+                };
+                updateDashboardUI(errorData);
+            }
+        }
+
+        // Update dashboard UI with data
+        function updateDashboardUI(data) {
+            console.log('Updating dashboard UI with data:', data);
+            
+            // Update upcoming bookings count
+            const upcomingCount = data.upcomingCount || data.upcomingBookings?.length || 0;
+            document.getElementById('upcoming-count').textContent = upcomingCount;
+            console.log('Updated upcoming count:', upcomingCount);
+            
+            // Update total bookings count
+            const totalBookings = data.totalBookings || data.allBookings?.length || 0;
+            document.getElementById('total-bookings').textContent = totalBookings;
+            console.log('Updated total bookings:', totalBookings);
+            
+            // Update available slots count
+            const availableSlots = data.availableCount || data.availableSlots?.length || 0;
+            document.getElementById('available-slots').textContent = availableSlots;
+            console.log('Updated available slots:', availableSlots);
+            
+            // Update upcoming bookings list with real data
+            const bookingsList = document.getElementById('upcoming-bookings-list');
+            
+            if (data.upcomingBookings && data.upcomingBookings.length > 0) {
+                bookingsList.innerHTML = data.upcomingBookings.map(booking => {
+                    // Determine status based on source
+                    let status = "Confirmed";
+                    let statusClass = "bg-green-100 text-green-700";
+                    
+                    if (booking.source === "calendar") {
+                        status = "Calendar";
+                        statusClass = "bg-blue-100 text-blue-700";
+                    }
+                    
+                    // Format date for display
+                    let displayDate = booking.date;
+                    const today = new Date().toISOString().split('T')[0];
+                    const tomorrow = new Date(Date.now() + 24*60*60*1000).toISOString().split('T')[0];
+                    
+                    if (booking.date === today) {
+                        displayDate = "Today";
+                    } else if (booking.date === tomorrow) {
+                        displayDate = "Tomorrow";
+                    }
+                    
+                    return `
+                        <div class="bg-white/80 backdrop-blur-sm p-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition-all mb-3 cursor-pointer" onclick="sendQuickMessage('Tell me about the ${booking.title} meeting')">
+                            <div class="flex justify-between items-start">
+                                <div class="flex-1">
+                                    <h4 class="font-semibold text-gray-900">${booking.title}</h4>
+                                    <p class="text-sm text-gray-600">${displayDate} at ${booking.time}</p>
+                                    <p class="text-sm text-gray-500">${booking.email || 'No email'}</p>
+                                    ${booking.location ? `<p class="text-xs text-gray-400">📍 ${booking.location}</p>` : ''}
+                                </div>
+                                <span class="px-2 py-1 text-xs ${statusClass} rounded-full font-medium">${status}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                bookingsList.innerHTML = `
+                    <div class="text-center py-8">
+                        <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <p class="text-gray-500 text-sm">No upcoming bookings</p>
+                        <p class="text-gray-400 text-xs mt-1">${data.calendarConnected ? 'Your calendar is connected but no events found.' : 'Connect your calendar to see your events here.'}</p>
+                    </div>
+                `;
+            }
+        }
+
+
+
+
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                // Check user status and show dashboard
+                await checkUserStatus();
+            } catch (error) {
+                console.error('Error initializing application:', error);
+                showError('Failed to initialize application. Please refresh the page.');
+            }
+        });
+
+        // Chat functionality
+        document.getElementById('chat-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (currentState !== UserJourney.DASHBOARD) {
+                return;
+            }
+            
+            const messageInput = document.getElementById('message-input');
+            const message = messageInput.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message to chat
+            addMessageToChat('user', message);
+            messageInput.value = '';
+            
+            try {
+                // Send message to AI
+                const response = await fetch('/dashboard/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to send message');
+                }
+                
+                const result = await response.json();
+                
+                // Add AI response to chat
+                addMessageToChat('ai', result.response);
+            } catch (error) {
+                console.error('Error sending message:', error);
+                addMessageToChat('ai', 'Sorry, I encountered an error. Please try again.');
+            }
+        });
+
+        // Add message to chat
+        function addMessageToChat(sender, message) {
+            const chatMessages = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`;
+            
+            messageDiv.innerHTML = `
+                <div class="max-w-lg">
+                    <div class="flex items-end space-x-2 ${sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''}">
+                        ${sender === 'user' ? '' : `
+                            <div class="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
                                 </svg>
                             </div>
-                            <h2 class="text-xl font-semibold mb-2 text-red-800">Calendar Connection Failed</h2>
-                            <p class="text-gray-600 mb-6">${error.message}</p>
-                            <button onclick="window.location.href='/dashboard'" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
-                                Back to Dashboard
-                            </button>
+                        `}
+                        <div class="px-4 py-3 rounded-2xl ${sender === 'user' ? 'bg-gradient-to-r from-cyan-500 to-purple-600 text-white rounded-br-md' : 'bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 rounded-bl-md'} shadow-lg">
+                            <p class="leading-relaxed">${message}</p>
+                        </div>
+                        ${sender === 'user' ? `
+                            <div class="w-8 h-8 bg-gradient-to-r from-white to-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+                                <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                </svg>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Quick message function
+        function sendQuickMessage(message) {
+            const messageInput = document.getElementById('message-input');
+            messageInput.value = message;
+            document.getElementById('chat-form').dispatchEvent(new Event('submit'));
+        }
+
+        // Clear chat function
+        function clearChat() {
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.innerHTML = `
+                <div class="flex justify-start animate-fade-in">
+                    <div class="max-w-lg">
+                        <div class="flex items-end space-x-2">
+                            <div class="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                </svg>
+                            </div>
+                            <div class="bg-white/10 backdrop-blur-sm px-4 py-3 rounded-2xl rounded-bl-md border border-white/20 shadow-lg">
+                                <p class="text-white/90 leading-relaxed">Chat cleared! How can I help you today?</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Auto-resize textarea
+        document.addEventListener('DOMContentLoaded', function() {
+            const textarea = document.getElementById('message-input');
+            if (textarea) {
+                textarea.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+                });
+            }
+        });
+
+        // Voice input functionality
+        let isRecording = false;
+        let recognition = null;
+
+        function toggleVoiceInput() {
+            const voiceBtn = document.getElementById('voice-btn');
+            
+            if (!isRecording) {
+                // Start recording
+                if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                    recognition.continuous = false;
+                    recognition.interimResults = false;
+                    recognition.lang = 'en-US';
+                    
+                    recognition.onstart = function() {
+                        isRecording = true;
+                        voiceBtn.classList.add('bg-red-100', 'text-red-600');
+                        voiceBtn.classList.remove('text-gray-600');
+                        voiceBtn.title = 'Stop Recording';
+                    };
+                    
+                    recognition.onresult = function(event) {
+                        const transcript = event.results[0][0].transcript;
+                        document.getElementById('message-input').value = transcript;
+                        document.getElementById('chat-form').dispatchEvent(new Event('submit'));
+                    };
+                    
+                    recognition.onerror = function(event) {
+                        console.error('Speech recognition error:', event.error);
+                        stopRecording();
+                    };
+                    
+                    recognition.onend = function() {
+                        stopRecording();
+                    };
+                    
+                    recognition.start();
+                } else {
+                    alert('Speech recognition is not supported in this browser.');
+                }
+            } else {
+                stopRecording();
+            }
+        }
+
+        function stopRecording() {
+            if (recognition) {
+                recognition.stop();
+            }
+            isRecording = false;
+            const voiceBtn = document.getElementById('voice-btn');
+            voiceBtn.classList.remove('bg-red-100', 'text-red-600');
+            voiceBtn.classList.add('text-gray-600');
+            voiceBtn.title = 'Voice Input';
+        }
+
+        // Clear chat functionality
+        function clearChat() {
+            if (confirm('Are you sure you want to clear the chat history?')) {
+                const chatMessages = document.getElementById('chat-messages');
+                chatMessages.innerHTML = `
+                    <div class="flex justify-start animate-fade-in">
+                        <div class="max-w-lg">
+                            <div class="flex items-end space-x-2">
+                                <div class="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                    </svg>
+                                </div>
+                                <div class="bg-gray-50 backdrop-blur-sm px-4 py-3 rounded-2xl rounded-bl-md border border-gray-200 shadow-lg">
+                                    <p class="text-gray-900 leading-relaxed">Chat cleared! How can I help you today?</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 `;
             }
         }
-    }
-    }).mount('#dashboard-app')
-    
-    // Global error handler to catch any Vue.js errors
-    window.addEventListener('error', function(e) {
-        if (e.message.includes('stats')) {
-            console.log('Caught stats error, reinitializing Vue component...');
-            // The error is likely happening during template compilation
-            // This should be handled by the v-if="stats" directive
+
+        // Export chat functionality
+        function exportChat() {
+            const chatMessages = document.getElementById('chat-messages');
+            const messages = chatMessages.querySelectorAll('.flex');
+            let exportText = 'AI Assistant Chat Export\n';
+            exportText += '='.repeat(30) + '\n\n';
+            
+            messages.forEach(message => {
+                const isUser = message.classList.contains('justify-end');
+                const messageText = message.querySelector('p')?.textContent || '';
+                const sender = isUser ? 'You' : 'AI Assistant';
+                exportText += `${sender}: ${messageText}\n\n`;
+            });
+            
+            const blob = new Blob([exportText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `chat-export-${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
-    });
-} catch (error) {
-    console.error('Vue.js initialization error:', error);
-    // Fallback: show the dashboard without Vue.js
-    document.getElementById('dashboard-app').classList.remove('hidden');
-    document.getElementById('loading-state').style.display = 'none';
-}
-</script>
-{% endblock %}
+
+        // Refresh dashboard data
+        function refreshDashboard() {
+            const refreshBtn = event.target.closest('button');
+            refreshBtn.classList.add('animate-spin');
+            
+            loadDashboardData().finally(() => {
+                setTimeout(() => {
+                    refreshBtn.classList.remove('animate-spin');
+                }, 1000);
+            });
+        }
+
+        // Copy public booking link
+        function copyPublicLink() {
+            const currentUrl = window.location.origin;
+            const schedulingSlug = '{{ current_user.scheduling_slug }}';
+            const publicLink = `${currentUrl}/${schedulingSlug}`;
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(publicLink).then(() => {
+                showCopyPopup();
+            }).catch(err => {
+                console.error('Failed to copy link: ', err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = publicLink;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                showCopyPopup();
+            });
+        }
+
+        // Show small copy popup
+        function showCopyPopup() {
+            // Remove existing popup if any
+            const existingPopup = document.getElementById('copy-popup');
+            if (existingPopup) {
+                existingPopup.remove();
+            }
+            
+            // Create popup
+            const popup = document.createElement('div');
+            popup.id = 'copy-popup';
+            popup.className = 'fixed top-4 right-4 bg-green-100 border border-green-200 text-green-700 px-3 py-2 rounded-lg shadow-lg z-50 flex items-center space-x-2 animate-fade-in';
+            popup.innerHTML = `
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                <span class="text-sm font-medium">Link copied!</span>
+            `;
+            
+            // Add to page
+            document.body.appendChild(popup);
+            
+            // Remove after 2 seconds
+            setTimeout(() => {
+                if (popup.parentNode) {
+                    popup.remove();
+                }
+            }, 2000);
+        }
+
+
+
+        // Enhanced quick message function with typing indicator
+        function sendQuickMessage(message) {
+            const messageInput = document.getElementById('message-input');
+            messageInput.value = message;
+            
+            // Add user message to chat immediately
+            addMessageToChat('user', message);
+            messageInput.value = '';
+            
+            // Show typing indicator
+            const typingIndicator = document.getElementById('typing-indicator');
+            typingIndicator.classList.remove('hidden');
+            
+            // Get current dashboard data for contextual responses
+            fetch('/dashboard/api/data', {
+                method: 'GET',
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                setTimeout(() => {
+                    typingIndicator.classList.add('hidden');
+                    
+                    // Generate contextual response based on real data
+                    let response = '';
+                    if (message.toLowerCase().includes('today')) {
+                        const todayBookings = data.upcomingBookings?.filter(b => {
+                            const today = new Date().toISOString().split('T')[0];
+                            return b.date === today;
+                        }) || [];
+                        
+                        if (todayBookings.length > 0) {
+                            response = `Here's your schedule for today:\n\n${todayBookings.map(b => `• ${b.time} - ${b.title}`).join('\n')}\n\nYou have ${todayBookings.length} meeting${todayBookings.length !== 1 ? 's' : ''} scheduled for today.`;
+                        } else {
+                            response = "You have no meetings scheduled for today. Would you like me to help you schedule something?";
+                        }
+                    } else if (message.toLowerCase().includes('availability') || message.toLowerCase().includes('free')) {
+                        const availableSlots = data.availableSlots || [];
+                        if (availableSlots.length > 0) {
+                            response = `Here are your available time slots:\n\n${availableSlots.map(slot => `• ${slot.date} ${slot.start_time} - ${slot.end_time}`).join('\n')}\n\nWould you like me to help you schedule something during these times?`;
+                        } else {
+                            response = "I don't see any available time slots in your calendar right now. Would you like me to help you set up your availability?";
+                        }
+                    } else if (message.toLowerCase().includes('upcoming') || message.toLowerCase().includes('appointments')) {
+                        const upcoming = data.upcomingBookings || [];
+                        if (upcoming.length > 0) {
+                            response = `Your upcoming appointments:\n\n${upcoming.slice(0, 5).map(b => `• ${b.date} ${b.time} - ${b.title}`).join('\n')}\n\nYou have ${upcoming.length} upcoming appointment${upcoming.length !== 1 ? 's' : ''}.`;
+                        } else {
+                            response = "You have no upcoming appointments scheduled. Would you like me to help you schedule something?";
+                        }
+                    } else if (message.toLowerCase().includes('schedule') || message.toLowerCase().includes('new meeting')) {
+                        response = "I can help you schedule a new meeting! Please provide:\n\n• Who you want to meet with\n• Preferred date and time\n• Meeting duration\n• Purpose of the meeting\n\nWhat details would you like to include?";
+                    } else if (message.toLowerCase().includes('tell me about')) {
+                        const eventTitle = message.toLowerCase().split('tell me about the ')[1]?.split(' meeting')[0];
+                        if (eventTitle) {
+                            const event = data.upcomingBookings?.find(b => 
+                                b.title.toLowerCase().includes(eventTitle.toLowerCase())
+                            );
+                            if (event) {
+                                response = `Here's what I know about "${event.title}":\n\n• Date: ${event.date}\n• Time: ${event.time}\n• ${event.location ? `Location: ${event.location}\n` : ''}${event.description ? `Description: ${event.description}` : ''}`;
+                            } else {
+                                response = `I couldn't find details about "${eventTitle}" in your upcoming meetings. Would you like me to check your full calendar?`;
+                            }
+                        } else {
+                            response = "I'd be happy to tell you about a specific meeting. Which meeting would you like to know more about?";
+                        }
+                    } else {
+                        response = "I understand you're asking about your schedule. Let me check your calendar and provide you with the most relevant information. Is there anything specific you'd like to know about your appointments or availability?";
+                    }
+                    
+                    addMessageToChat('ai', response);
+                }, 1500);
+            })
+            .catch(error => {
+                typingIndicator.classList.add('hidden');
+                addMessageToChat('ai', "I'm having trouble accessing your calendar data right now. Please try refreshing the dashboard or check your calendar connection.");
+            });
+        }
+
+        // Calendar connection logic
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const connectionId = urlParams.get('calendar_connection_id');
+            
+            if (connectionId) {
+                console.log('Calendar connection detected, completing connection...');
+                
+                // Complete the calendar connection
+                fetch('/dashboard/api/calendar/connect', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    credentials: 'include',
+                    body: `connection_id=${connectionId}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('Calendar connected successfully!');
+                        // Remove the connection ID from URL
+                        const newUrl = window.location.pathname;
+                        window.history.replaceState({}, document.title, newUrl);
+                        
+                        // Refresh the page to show updated status
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    } else {
+                        console.error('Calendar connection failed:', data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Calendar connection error:', error);
+                });
+            }
+        });
+    </script>
+</body>
+</html>

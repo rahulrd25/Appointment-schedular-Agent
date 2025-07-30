@@ -7,605 +7,773 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
-<!-- Custom Flatpickr Styling for Compact Square Design -->
 <style>
-/* Date Input Placeholder Styling */
-#date::placeholder {
-    color: #000000 !important;
-    opacity: 1 !important;
-    font-weight: 600 !important;
-}
-/* Custom Time Dropdown Styling - Matching Date Picker */
-#start_time {
-    appearance: none !important;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e") !important;
-    background-position: right 12px center !important;
-    background-repeat: no-repeat !important;
-    background-size: 16px 12px !important;
-    padding-right: 40px !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    border-radius: 12px !important;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
-}
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
 
-#start_time:hover {
-    border-color: #6366f1 !important;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1), 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
-    transform: translateY(-1px) !important;
-}
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        min-height: 100vh;
+    }
 
-#start_time:focus {
-    border-color: #6366f1 !important;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2), 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
-    outline: none !important;
-    transform: translateY(-1px) !important;
-}
+    .main-container {
+        display: flex;
+        min-height: 100vh;
+    }
 
-/* Style the dropdown options */
-#start_time option {
-    padding: 12px 16px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    color: #374151 !important;
-    background: white !important;
-    border-radius: 8px !important;
-    margin: 2px 0 !important;
-}
+    .sidebar {
+        width: 280px;
+        background: white;
+        border-right: 1px solid #e2e8f0;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        z-index: 10;
+    }
 
-#start_time option:hover {
-    background-color: #f3f4f6 !important;
-    color: #1f2937 !important;
-}
+    .content-area {
+        flex: 1;
+        background: transparent;
+        overflow-y: auto;
+    }
 
-#start_time option:checked {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-    color: white !important;
-    font-weight: 600 !important;
-}
+    .header {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 20px 30px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
 
-/* Dropdown container styling */
-#start_time:focus {
-    border-color: #6366f1 !important;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2), 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
-}
-/* Enhanced Flatpickr Calendar - Moderate Size */
-.flatpickr-calendar {
-    width: 320px !important;
-    font-size: 14px !important;
-    border-radius: 16px !important;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
-    border: 2px solid #e5e7eb !important;
-    padding: 16px !important;
-    min-height: 300px !important;
-    transform: scale(1.05) !important;
-    transition: all 0.3s ease !important;
-}
+    .page-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: white;
+        margin-bottom: 8px;
+    }
 
-.flatpickr-calendar.open {
-    display: inline-block !important;
-}
+    .page-subtitle {
+        color: white;
+        font-size: 16px;
+    }
 
-/* Header - Enhanced */
-.flatpickr-months {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-    color: white !important;
-    padding: 16px 20px !important;
-    border-radius: 12px 12px 0 0 !important;
-    font-weight: 600 !important;
-    font-size: 18px !important;
-    text-align: center !important;
-    margin-bottom: 8px !important;
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-}
+    .form-card {
+        background: white;
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        border: 1px solid #e2e8f0;
+        margin-bottom: 20px;
+    }
 
-.flatpickr-month {
-    height: 32px !important;
-}
+    .form-group {
+        margin-bottom: 24px;
+    }
 
-.flatpickr-current-month {
-    font-size: 16px !important;
-    font-weight: 600 !important;
-    padding: 0 12px !important;
-    color: white !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-    flex: 1 !important;
-    justify-content: center !important;
-}
+    .form-label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 8px;
+    }
 
-.flatpickr-monthDropdown-months,
-.flatpickr-current-month .numInputWrapper {
-    font-size: 16px !important;
-    color: white !important;
-    margin: 0 4px !important;
-    min-width: 60px !important;
-}
+    .form-input {
+        width: 100%;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 12px 16px;
+        font-size: 14px;
+        transition: all 0.2s ease;
+        background: white;
+    }
 
-/* Weekdays */
-.flatpickr-weekdays {
-    height: 28px !important;
-}
+    .form-input:focus {
+        outline: none;
+        border-color: #1e3c72;
+        box-shadow: 0 0 0 3px rgba(30, 60, 114, 0.1);
+    }
 
-.flatpickr-weekday {
-    font-size: 11px !important;
-    font-weight: 600 !important;
-    color: #6b7280 !important;
-}
+    .btn-primary {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
 
-/* Days - Enhanced */
-.flatpickr-days {
-    padding: 6px !important;
-}
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 25px rgba(30, 60, 114, 0.3);
+    }
 
-.flatpickr-day {
-    width: 40px !important;
-    height: 40px !important;
-    line-height: 40px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    border-radius: 8px !important;
-    margin: 2px !important;
-    color: #374151 !important;
-    transition: all 0.2s ease !important;
-    border: 1px solid #f3f4f6 !important;
-}
+    .btn-secondary {
+        background: white;
+        color: #1e3c72;
+        border: 2px solid #1e3c72;
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
 
-/* Navigation Arrows */
-.flatpickr-months .flatpickr-prev-month,
-.flatpickr-months .flatpickr-next-month {
-    width: 32px !important;
-    height: 32px !important;
-    padding: 0 !important;
-    top: 50% !important;
-    transform: translateY(-50%) !important;
-    position: absolute !important;
-}
+    .btn-secondary:hover {
+        background: #1e3c72;
+        color: white;
+        transform: translateY(-1px);
+    }
 
-.flatpickr-months .flatpickr-prev-month svg,
-.flatpickr-months .flatpickr-next-month svg {
-    width: 16px !important;
-    height: 16px !important;
-}
+    .slots-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 16px;
+        margin-top: 20px;
+    }
 
-/* Today and Selected States - Enhanced */
-.flatpickr-day.today {
-    background: #fef3c7 !important;
-    border-color: #f59e0b !important;
-    color: #92400e !important;
-    font-weight: 600 !important;
-}
+    .slot-card {
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        border: 1px solid #e2e8f0;
+        transition: all 0.3s ease;
+    }
 
-.flatpickr-day.selected {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-    border-color: #4f46e5 !important;
-    color: white !important;
-    box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.3) !important;
-}
+    .slot-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    }
 
-.flatpickr-day.selected:hover {
-    background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%) !important;
-    border-color: #4338ca !important;
-    color: white !important;
-    transform: scale(1.05) !important;
-}
+    .slot-time {
+        font-size: 16px;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 4px;
+    }
 
-/* Hover States - Enhanced */
-.flatpickr-day:hover {
-    background: #f3f4f6 !important;
-    border-color: #d1d5db !important;
-    transform: scale(1.05) !important;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
-}
+    .slot-date {
+        font-size: 14px;
+        color: #64748b;
+    }
 
-/* Time Picker Styling - Vertical List */
-.flatpickr-calendar.timepicker {
-    width: 120px !important;
-    font-size: 12px !important;
-    border-radius: 6px !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-    border: 1px solid #d1d5db !important;
-    padding: 4px !important;
-    min-height: auto !important;
-    transform: scale(1.01) !important;
-    transition: all 0.2s ease !important;
-    display: flex !important;
-    flex-direction: column !important;
-}
+    .delete-btn {
+        background: #fee2e2;
+        color: #dc2626;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
 
-/* Time Picker Header - Vertical List */
-.flatpickr-calendar.timepicker .flatpickr-months {
-    background: #f8fafc !important;
-    color: #374151 !important;
-    padding: 6px 8px !important;
-    border-radius: 4px 4px 0 0 !important;
-    font-weight: 600 !important;
-    font-size: 11px !important;
-    text-align: center !important;
-    margin-bottom: 2px !important;
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
-    border-bottom: 1px solid #e5e7eb !important;
-}
+    .delete-btn:hover {
+        background: #fecaca;
+        transform: translateY(-1px);
+    }
 
-.flatpickr-calendar.timepicker .flatpickr-current-month {
-    font-size: 11px !important;
-    font-weight: 600 !important;
-    padding: 0 4px !important;
-    color: #374151 !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 2px !important;
-    justify-content: center !important;
-}
+    /* Date Input Placeholder Styling */
+    #date::placeholder {
+        color: #000000 !important;
+        opacity: 1 !important;
+        font-weight: 600 !important;
+    }
 
-/* Time Picker Input Fields - Vertical List */
-.flatpickr-calendar.timepicker .numInputWrapper {
-    background: white !important;
-    border: 1px solid #e5e7eb !important;
-    border-radius: 3px !important;
-    padding: 3px 4px !important;
-    margin: 1px 2px !important;
-    font-size: 11px !important;
-    font-weight: 500 !important;
-    color: #374151 !important;
-    min-width: 35px !important;
-    text-align: center !important;
-    display: inline-block !important;
-}
+    /* Custom Time Dropdown Styling - Matching Date Picker */
+    #start_time {
+        appearance: none !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e") !important;
+        background-position: right 12px center !important;
+        background-repeat: no-repeat !important;
+        background-size: 16px 12px !important;
+        padding-right: 40px !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+    }
 
-.flatpickr-calendar.timepicker .numInputWrapper:hover {
-    background: #f9fafb !important;
-    border-color: #9ca3af !important;
-    transform: scale(1.01) !important;
-}
+    #start_time:hover {
+        border-color: #1e3c72 !important;
+        box-shadow: 0 0 0 3px rgba(30, 60, 114, 0.1), 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+        transform: translateY(-1px) !important;
+    }
 
-.flatpickr-calendar.timepicker .numInputWrapper input {
-    background: transparent !important;
-    border: none !important;
-    color: #374151 !important;
-    font-size: 11px !important;
-    font-weight: 500 !important;
-    text-align: center !important;
-    width: 100% !important;
-    padding: 0 !important;
-}
+    #start_time:focus {
+        border-color: #1e3c72 !important;
+        box-shadow: 0 0 0 3px rgba(30, 60, 114, 0.2), 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+        outline: none !important;
+        transform: translateY(-1px) !important;
+    }
 
-/* Time Picker Buttons - Vertical List */
-.flatpickr-calendar.timepicker .flatpickr-am-pm {
-    background: #3b82f6 !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 3px !important;
-    padding: 3px 6px !important;
-    font-size: 10px !important;
-    font-weight: 600 !important;
-    margin: 1px 2px !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    display: inline-block !important;
-}
+    /* Style the dropdown options */
+    #start_time option {
+        padding: 12px 16px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        color: #374151 !important;
+        background: white !important;
+        border-radius: 8px !important;
+        margin: 2px 0 !important;
+    }
 
-.flatpickr-calendar.timepicker .flatpickr-am-pm:hover {
-    background: #2563eb !important;
-    transform: scale(1.02) !important;
-}
+    #start_time option:hover {
+        background-color: #f3f4f6 !important;
+        color: #1f2937 !important;
+    }
 
-/* Time Picker Navigation - Vertical List */
-.flatpickr-calendar.timepicker .flatpickr-months .flatpickr-prev-month,
-.flatpickr-calendar.timepicker .flatpickr-months .flatpickr-next-month {
-    width: 16px !important;
-    height: 16px !important;
-    padding: 0 !important;
-    top: 50% !important;
-    transform: translateY(-50%) !important;
-    position: absolute !important;
-}
+    #start_time option:checked {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%) !important;
+        color: white !important;
+        font-weight: 600 !important;
+    }
 
-.flatpickr-calendar.timepicker .flatpickr-months .flatpickr-prev-month svg,
-.flatpickr-calendar.timepicker .flatpickr-months .flatpickr-next-month svg {
-    width: 8px !important;
-    height: 8px !important;
-}
+    /* Enhanced Flatpickr Calendar - Moderate Size */
+    .flatpickr-calendar {
+        width: 320px !important;
+        font-size: 14px !important;
+        border-radius: 16px !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+        border: 2px solid #e5e7eb !important;
+        padding: 16px !important;
+        min-height: 300px !important;
+        transform: scale(1.05) !important;
+        transition: all 0.3s ease !important;
+    }
 
-/* Vertical Time Picker Specific Styling */
-.flatpickr-calendar.timepicker-vertical {
-    width: 180px !important;
-    min-height: 120px !important;
-    padding: 8px !important;
-    border-radius: 8px !important;
-    font-size: 13px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-}
+    .flatpickr-calendar.open {
+        display: inline-block !important;
+    }
 
-.flatpickr-calendar.timepicker-vertical .flatpickr-months {
-    background: #f8fafc !important;
-    color: #374151 !important;
-    padding: 6px 8px !important;
-    border-radius: 6px 6px 0 0 !important;
-    font-weight: 600 !important;
-    font-size: 12px !important;
-    text-align: center !important;
-    margin-bottom: 4px !important;
-    width: 100% !important;
-}
+    /* Header - Enhanced */
+    .flatpickr-months {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%) !important;
+        color: white !important;
+        padding: 16px 20px !important;
+        border-radius: 12px 12px 0 0 !important;
+        font-weight: 600 !important;
+        font-size: 18px !important;
+        text-align: center !important;
+        margin-bottom: 8px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+    }
 
-.flatpickr-calendar.timepicker-vertical .flatpickr-current-month {
-    font-size: 12px !important;
-    font-weight: 600 !important;
-    padding: 0 4px !important;
-    color: #374151 !important;
-    text-align: center !important;
-}
+    .flatpickr-month {
+        height: 32px !important;
+    }
 
-.flatpickr-calendar.timepicker-vertical .numInputWrapper {
-    background: white !important;
-    border: 1px solid #e5e7eb !important;
-    border-radius: 4px !important;
-    padding: 8px 6px !important;
-    margin: 2px !important;
-    font-size: 12px !important;
-    font-weight: 500 !important;
-    color: #374151 !important;
-    min-width: 45px !important;
-    min-height: 35px !important;
-    text-align: center !important;
-    display: inline-block !important;
-}
+    .flatpickr-current-month {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        padding: 0 12px !important;
+        color: white !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        flex: 1 !important;
+        justify-content: center !important;
+    }
 
-.flatpickr-calendar.timepicker-vertical .flatpickr-am-pm {
-    background: #3b82f6 !important;
-    color: white !important;
-    border: none !important;
-    border-radius: 4px !important;
-    padding: 4px 8px !important;
-    font-size: 11px !important;
-    font-weight: 600 !important;
-    margin: 2px !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    display: inline-block !important;
-}
+    .flatpickr-monthDropdown-months,
+    .flatpickr-current-month .numInputWrapper {
+        font-size: 16px !important;
+        color: white !important;
+        margin: 0 4px !important;
+        min-width: 60px !important;
+    }
 
-/* Disabled Days */
-.flatpickr-day.disabled {
-    color: #d1d5db !important;
-}
+    /* Weekdays */
+    .flatpickr-weekdays {
+        height: 28px !important;
+    }
 
-/* Input Styling */
-.flatpickr-input {
-    background: white !important;
-    border: 1px solid #d1d5db !important;
-    border-radius: 6px !important;
-    padding: 8px 12px !important;
-    font-size: 14px !important;
-    color: black !important;
-}
+    .flatpickr-weekday {
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        color: #6b7280 !important;
+    }
 
-.flatpickr-input:focus {
-    border-color: #3b82f6 !important;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
-    color: black !important;
-}
+    /* Days - Enhanced */
+    .flatpickr-days {
+        padding: 6px !important;
+    }
 
-/* HTML5 Date Picker Styling */
-input[type="date"]::-webkit-calendar-picker-indicator {
-    background: transparent;
-    bottom: 0;
-    color: transparent;
-    cursor: pointer;
-    height: auto;
-    left: 0;
-    position: absolute;
-    right: 0;
-    top: 0;
-    width: auto;
-}
+    .flatpickr-day {
+        width: 40px !important;
+        height: 40px !important;
+        line-height: 40px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        border-radius: 8px !important;
+        margin: 2px !important;
+        color: #374151 !important;
+        transition: all 0.2s ease !important;
+        border: 1px solid #f3f4f6 !important;
+    }
 
-/* Date Input Focus Enhancement */
-input[type="date"]:focus {
-    border-color: #3b82f6 !important;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
-    transform: scale(1.02) !important;
-    transition: all 0.2s ease !important;
-}
+    /* Navigation Arrows */
+    .flatpickr-months .flatpickr-prev-month,
+    .flatpickr-months .flatpickr-next-month {
+        width: 32px !important;
+        height: 32px !important;
+        padding: 0 !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        position: absolute !important;
+    }
 
-/* Date Input Hover Effect */
-input[type="date"]:hover {
-    border-color: #9ca3af !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-}
+    .flatpickr-months .flatpickr-prev-month svg,
+    .flatpickr-months .flatpickr-next-month svg {
+        width: 16px !important;
+        height: 16px !important;
+    }
 
-/* Native Date Picker Calendar Enhancement */
-::-webkit-calendar-picker {
-    background: white !important;
-    border: 2px solid #e5e7eb !important;
-    border-radius: 12px !important;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
-    font-size: 16px !important;
-    padding: 16px !important;
-    min-width: 320px !important;
-    min-height: 280px !important;
-}
+    /* Today and Selected States - Enhanced */
+    .flatpickr-day.today {
+        background: #fef3c7 !important;
+        border-color: #f59e0b !important;
+        color: #92400e !important;
+        font-weight: 600 !important;
+    }
 
-/* Date Picker Header */
-::-webkit-calendar-picker-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-    color: white !important;
-    padding: 12px 16px !important;
-    border-radius: 8px 8px 0 0 !important;
-    font-weight: 600 !important;
-    font-size: 18px !important;
-    text-align: center !important;
-}
+    .flatpickr-day.selected {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        border-color: #4f46e5 !important;
+        color: white !important;
+        box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.3) !important;
+    }
 
-/* Date Picker Navigation */
-::-webkit-calendar-picker-nav {
-    background: rgba(255, 255, 255, 0.1) !important;
-    border-radius: 6px !important;
-    padding: 8px !important;
-    margin: 8px !important;
-}
+    .flatpickr-day.selected:hover {
+        background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%) !important;
+        border-color: #4338ca !important;
+        color: white !important;
+        transform: scale(1.05) !important;
+    }
 
-/* Date Picker Days */
-::-webkit-calendar-picker-day {
-    background: white !important;
-    border: 1px solid #f3f4f6 !important;
-    border-radius: 8px !important;
-    padding: 12px 8px !important;
-    margin: 2px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    color: #374151 !important;
-    transition: all 0.2s ease !important;
-    min-width: 40px !important;
-    min-height: 40px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-}
+    /* Hover States - Enhanced */
+    .flatpickr-day:hover {
+        background: #f3f4f6 !important;
+        border-color: #d1d5db !important;
+        transform: scale(1.05) !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+    }
 
-::-webkit-calendar-picker-day:hover {
-    background: #f3f4f6 !important;
-    border-color: #d1d5db !important;
-    transform: scale(1.05) !important;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
-}
+    /* Time Picker Styling - Vertical List */
+    .flatpickr-calendar.timepicker {
+        width: 120px !important;
+        font-size: 12px !important;
+        border-radius: 6px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+        border: 1px solid #d1d5db !important;
+        padding: 4px !important;
+        min-height: auto !important;
+        transform: scale(1.01) !important;
+        transition: all 0.2s ease !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
 
-::-webkit-calendar-picker-day:selected {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-    color: white !important;
-    border-color: #4f46e5 !important;
-    box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.3) !important;
-}
+    /* Time Picker Header - Vertical List */
+    .flatpickr-calendar.timepicker .flatpickr-months {
+        background: #f8fafc !important;
+        color: #374151 !important;
+        padding: 6px 8px !important;
+        border-radius: 4px 4px 0 0 !important;
+        font-weight: 600 !important;
+        font-size: 11px !important;
+        text-align: center !important;
+        margin-bottom: 2px !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        border-bottom: 1px solid #e5e7eb !important;
+    }
 
-/* Today's Date */
-::-webkit-calendar-picker-day:today {
-    background: #fef3c7 !important;
-    border-color: #f59e0b !important;
-    color: #92400e !important;
-    font-weight: 600 !important;
-}
+    .flatpickr-calendar.timepicker .flatpickr-current-month {
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        padding: 0 4px !important;
+        color: #374151 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 2px !important;
+        justify-content: center !important;
+    }
 
-/* Weekend Days */
-::-webkit-calendar-picker-day:weekend {
-    color: #dc2626 !important;
-}
+    /* Time Picker Input Fields - Vertical List */
+    .flatpickr-calendar.timepicker .numInputWrapper {
+        background: white !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 3px !important;
+        padding: 3px 4px !important;
+        margin: 1px 2px !important;
+        font-size: 11px !important;
+        font-weight: 500 !important;
+        color: #374151 !important;
+        min-width: 35px !important;
+        text-align: center !important;
+        display: inline-block !important;
+    }
 
-/* Month/Year Navigation */
-::-webkit-calendar-picker-month,
-::-webkit-calendar-picker-year {
-    background: rgba(255, 255, 255, 0.9) !important;
-    border: 1px solid #e5e7eb !important;
-    border-radius: 6px !important;
-    padding: 8px 12px !important;
-    font-size: 16px !important;
-    font-weight: 500 !important;
-    color: #374151 !important;
-    margin: 4px !important;
-}
+    .flatpickr-calendar.timepicker .numInputWrapper:hover {
+        background: #f9fafb !important;
+        border-color: #9ca3af !important;
+        transform: scale(1.01) !important;
+    }
 
-::-webkit-calendar-picker-month:hover,
-::-webkit-calendar-picker-year:hover {
-    background: #f9fafb !important;
-    border-color: #d1d5db !important;
-    transform: scale(1.02) !important;
-}
+    .flatpickr-calendar.timepicker .numInputWrapper input {
+        background: transparent !important;
+        border: none !important;
+        color: #374151 !important;
+        font-size: 11px !important;
+        font-weight: 500 !important;
+        text-align: center !important;
+        width: 100% !important;
+        padding: 0 !important;
+    }
 
-/* Modal Styles */
-.modal {
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+    /* Time Picker Buttons - Vertical List */
+    .flatpickr-calendar.timepicker .flatpickr-am-pm {
+        background: #3b82f6 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 3px !important;
+        padding: 3px 6px !important;
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        margin: 1px 2px !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+        display: inline-block !important;
+    }
 
-.modal.show {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+    .flatpickr-calendar.timepicker .flatpickr-am-pm:hover {
+        background: #2563eb !important;
+        transform: scale(1.02) !important;
+    }
 
-.modal-content {
-    background-color: white;
-    border-radius: 12px;
-    padding: 0;
-    width: 90%;
-    max-width: 500px;
-    max-height: 90vh;
-    overflow-y: auto;
-    position: relative;
-}
+    /* Time Picker Navigation - Vertical List */
+    .flatpickr-calendar.timepicker .flatpickr-months .flatpickr-prev-month,
+    .flatpickr-calendar.timepicker .flatpickr-months .flatpickr-next-month {
+        width: 16px !important;
+        height: 16px !important;
+        padding: 0 !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        position: absolute !important;
+    }
 
-.modal-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 20px;
-    border-radius: 12px 12px 0 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
+    .flatpickr-calendar.timepicker .flatpickr-months .flatpickr-prev-month svg,
+    .flatpickr-calendar.timepicker .flatpickr-months .flatpickr-next-month svg {
+        width: 8px !important;
+        height: 8px !important;
+    }
 
-.modal-body {
-    padding: 24px;
-}
+    /* Vertical Time Picker Specific Styling */
+    .flatpickr-calendar.timepicker-vertical {
+        width: 180px !important;
+        min-height: 120px !important;
+        padding: 8px !important;
+        border-radius: 8px !important;
+        font-size: 13px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+    }
 
-.close {
-    color: white;
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-    background: none;
-    border: none;
-    padding: 0;
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    transition: background-color 0.3s;
-}
+    .flatpickr-calendar.timepicker-vertical .flatpickr-months {
+        background: #f8fafc !important;
+        color: #374151 !important;
+        padding: 6px 8px !important;
+        border-radius: 6px 6px 0 0 !important;
+        font-weight: 600 !important;
+        font-size: 12px !important;
+        text-align: center !important;
+        margin-bottom: 4px !important;
+        width: 100% !important;
+    }
 
-.close:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-}
+    .flatpickr-calendar.timepicker-vertical .flatpickr-current-month {
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        padding: 0 4px !important;
+        color: #374151 !important;
+        text-align: center !important;
+    }
+
+    .flatpickr-calendar.timepicker-vertical .numInputWrapper {
+        background: white !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 4px !important;
+        padding: 8px 6px !important;
+        margin: 2px !important;
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        color: #374151 !important;
+        min-width: 45px !important;
+        min-height: 35px !important;
+        text-align: center !important;
+        display: inline-block !important;
+    }
+
+    .flatpickr-calendar.timepicker-vertical .flatpickr-am-pm {
+        background: #3b82f6 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 4px !important;
+        padding: 4px 8px !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        margin: 2px !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+        display: inline-block !important;
+    }
+
+    /* Disabled Days */
+    .flatpickr-day.disabled {
+        color: #d1d5db !important;
+    }
+
+    /* Input Styling */
+    .flatpickr-input {
+        background: white !important;
+        border: 1px solid #d1d5db !important;
+        border-radius: 6px !important;
+        padding: 8px 12px !important;
+        font-size: 14px !important;
+        color: black !important;
+    }
+
+    .flatpickr-input:focus {
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+        color: black !important;
+    }
+
+    /* HTML5 Date Picker Styling */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        background: transparent;
+        bottom: 0;
+        color: transparent;
+        cursor: pointer;
+        height: auto;
+        left: 0;
+        position: absolute;
+        right: 0;
+        top: 0;
+        width: auto;
+    }
+
+    /* Date Input Focus Enhancement */
+    input[type="date"]:focus {
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+        transform: scale(1.02) !important;
+        transition: all 0.2s ease !important;
+    }
+
+    /* Date Input Hover Effect */
+    input[type="date"]:hover {
+        border-color: #9ca3af !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    /* Native Date Picker Calendar Enhancement */
+    ::-webkit-calendar-picker {
+        background: white !important;
+        border: 2px solid #e5e7eb !important;
+        border-radius: 12px !important;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+        font-size: 16px !important;
+        padding: 16px !important;
+        min-width: 320px !important;
+        min-height: 280px !important;
+    }
+
+    /* Date Picker Header */
+    ::-webkit-calendar-picker-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white !important;
+        padding: 12px 16px !important;
+        border-radius: 8px 8px 0 0 !important;
+        font-weight: 600 !important;
+        font-size: 18px !important;
+        text-align: center !important;
+    }
+
+    /* Date Picker Navigation */
+    ::-webkit-calendar-picker-nav {
+        background: rgba(255, 255, 255, 0.1) !important;
+        border-radius: 6px !important;
+        padding: 8px !important;
+        margin: 8px !important;
+    }
+
+    /* Date Picker Days */
+    ::-webkit-calendar-picker-day {
+        background: white !important;
+        border: 1px solid #f3f4f6 !important;
+        border-radius: 8px !important;
+        padding: 12px 8px !important;
+        margin: 2px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        color: #374151 !important;
+        transition: all 0.2s ease !important;
+        min-width: 40px !important;
+        min-height: 40px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    ::-webkit-calendar-picker-day:hover {
+        background: #f3f4f6 !important;
+        border-color: #d1d5db !important;
+        transform: scale(1.05) !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    ::-webkit-calendar-picker-day:selected {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white !important;
+        border-color: #4f46e5 !important;
+        box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.3) !important;
+    }
+
+    /* Today's Date */
+    ::-webkit-calendar-picker-day:today {
+        background: #fef3c7 !important;
+        border-color: #f59e0b !important;
+        color: #92400e !important;
+        font-weight: 600 !important;
+    }
+
+    /* Weekend Days */
+    ::-webkit-calendar-picker-day:weekend {
+        color: #dc2626 !important;
+    }
+
+    /* Month/Year Navigation */
+    ::-webkit-calendar-picker-month,
+    ::-webkit-calendar-picker-year {
+        background: rgba(255, 255, 255, 0.9) !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 6px !important;
+        padding: 8px 12px !important;
+        font-size: 16px !important;
+        font-weight: 500 !important;
+        color: #374151 !important;
+        margin: 4px !important;
+    }
+
+    ::-webkit-calendar-picker-month:hover,
+    ::-webkit-calendar-picker-year:hover {
+        background: #f9fafb !important;
+        border-color: #d1d5db !important;
+        transform: scale(1.02) !important;
+    }
+
+    /* Modal Styles */
+    .modal {
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal.show {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-content {
+        background-color: white;
+        border-radius: 12px;
+        padding: 0;
+        width: 90%;
+        max-width: 500px;
+        max-height: 90vh;
+        overflow-y: auto;
+        position: relative;
+    }
+
+    .modal-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 12px 12px 0 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-body {
+        padding: 24px;
+    }
+
+    .close {
+        color: white;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+        background: none;
+        border: none;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: background-color 0.3s;
+    }
+
+    .close:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="flex h-screen bg-gray-100">
+<div class="main-container">
     <!-- Sidebar -->
     {% set sidebar_active = 'availability' %}
     {% include '_sidebar.html' %}
 
     <!-- Main Content -->
-    <div class="flex-1 overflow-auto">
+    <div class="content-area">
         <!-- Header -->
-        <header class="bg-white shadow-sm border-b">
-            <div class="flex items-center justify-between px-6 py-4">
+        <div class="header">
+            <div class="flex items-center justify-between">
                 <div>
-                    <h1 class="text-2xl font-semibold text-gray-900">Availability</h1>
-                    <p class="text-gray-600">Manage your available time slots for bookings</p>
+                    <h1 class="page-title">Availability</h1>
+                    <p class="page-subtitle">Manage your available time slots for bookings</p>
                 </div>
                 
                 <div class="flex items-center space-x-4">
                     <div class="flex items-center space-x-2">
-                        <span class="text-sm text-gray-600">Welcome,</span>
-                        <span class="font-medium text-gray-900">{{ current_user.full_name or current_user.email }}</span>
+                        <span class="text-sm text-white">Welcome,</span>
+                        <span class="font-medium text-white">{{ current_user.full_name or current_user.email }}</span>
                     </div>
                     <a href="/logout" class="text-gray-600 hover:text-gray-900">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -614,38 +782,25 @@ input[type="date"]:hover {
                     </a>
                 </div>
             </div>
-        </header>
+        </div>
 
         <!-- Availability Content -->
-        <main class="p-4">
+        <div style="padding: 30px;">
             <!-- Calendar Connection Status -->
-            {% if not current_user.google_calendar_connected %}
-            <div class="bg-gradient-to-r from-amber-500 to-orange-600 rounded-lg p-4 mb-6 text-white">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h2 class="text-lg font-bold mb-2">📅 Connect Your Google Calendar</h2>
-                        <p class="text-amber-100">Connect your Google Calendar to automatically sync your availability and avoid double bookings.</p>
-                    </div>
-                    <a href="/settings" class="bg-white text-amber-600 px-4 py-2 rounded-lg font-medium hover:bg-amber-50 transition">
-                        Connect Calendar
-                    </a>
-                </div>
-            </div>
-            {% endif %}
-
+            
             <!-- Main Layout -->
             <div class="max-w-7xl mx-auto">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" style="margin-top: 30px;">
                     <!-- Add Slot Card - Always Visible -->
-                    <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-                        <div class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-6 rounded-t-xl -m-6 mb-6">
+                    <div class="form-card">
+                        <div class="mb-6">
                             <div class="flex items-center justify-between">
-                                <h2 class="text-xl font-semibold">➕ Add New Slot</h2>
+                                <h2 class="text-xl font-semibold text-gray-900">Add New Slot</h2>
                             </div>
                         </div>
                         
                         <form hx-post="/dashboard/api/availability/" hx-target="#availability-list" hx-swap="beforeend" class="space-y-6">
-                            <div id="form-error" class="text-red-500 text-sm mb-4 hidden bg-red-50 border border-red-200 rounded-lg p-3">
+                            <div id="form-error" class="text-red-500 text-sm mb-4 hidden" style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 12px; padding: 12px;">
                                 <div class="flex items-center">
                                     <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                                         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
@@ -653,16 +808,16 @@ input[type="date"]:hover {
                                     Please select all fields first
                                 </div>
                             </div>
-                            <div>
-                                <label for="date" class="block text-base font-bold text-black mb-3">📅 Date</label>
-                                <input type="text" id="date" name="date" required class="block w-[600px] px-4 py-3 rounded-lg bg-white border-2 border-gray-300 text-black font-semibold text-base focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-200" placeholder="Select date">
+                            <div class="form-group">
+                                <label for="date" class="form-label">📅 Date</label>
+                                <input type="text" id="date" name="date" required class="form-input" placeholder="Select date">
                             </div>
                             
-                            <div>
-                                <label for="start_time" class="block text-base font-bold text-black mb-3">⏰ Start Time</label>
+                            <div class="form-group">
+                                <label for="start_time" class="form-label">⏰ Start Time</label>
                                 <div class="relative">
                                     <input type="hidden" id="start_time" name="start_time" value="" required>
-                                    <button type="button" id="time-dropdown-trigger" class="w-full px-4 py-3 rounded-lg bg-white border-2 border-gray-300 text-gray-800 font-semibold text-base focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-200 text-left flex justify-between items-center">
+                                    <button type="button" id="time-dropdown-trigger" class="form-input text-left flex justify-between items-center">
                                         <span id="selected-time-display">Select time</span>
                                         <svg class="w-5 h-5 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -726,8 +881,8 @@ input[type="date"]:hover {
                             </div>
                             
                             <div class="flex space-x-3">
-                                <button type="button" onclick="handleSubmit()" class="flex-1 bg-indigo-600 text-white p-3 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 font-medium">
-                                    ➕ Add Slot
+                                <button type="button" onclick="handleSubmit()" class="flex-1 text-white p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 font-medium" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);" onmouseover="this.style.background='linear-gradient(135deg, #2a5298 0%, #1e3c72 100%)'" onmouseout="this.style.background='linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)'">
+                                    Add Slot
                                 </button>
                                 <button type="button" onclick="this.form.reset()" class="flex-1 bg-gray-300 text-gray-700 p-3 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 font-medium">
                                     Reset
@@ -910,7 +1065,7 @@ input[type="date"]:hover {
                     </div>
                 </div>
             </div>
-        </main>
+        </div>
     </div>
 </div>
 

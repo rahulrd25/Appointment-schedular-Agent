@@ -378,6 +378,7 @@
         {% else %}
             <div class="profile-img">{{ user.full_name.split()[0][:1].upper() + user.full_name.split()[-1][:1].upper() if user.full_name.split()|length > 1 else user.full_name[:2].upper() }}</div>
         {% endif %}
+        <div style="font-size: 16px; font-weight: 600; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; opacity: 0.9; margin-bottom: 15px;">{{ user.email }}</div>
         <h1 class="meeting-title">{{ user.meeting_title or '30 Minute Meeting' }}</h1>
         <div class="meeting-duration">⏰ {{ user.meeting_duration or 30 }} min</div>
         <div class="meeting-description" style="font-size: 15px;">
@@ -704,6 +705,58 @@ createApp({
                 days.push({ dayNumber: '', date: '', isAvailable: false, isCurrentMonth: false, isSelected: false, isToday: false });
             }
             this.calendarDays = days;
+        },
+        async loadCalendarEvents() {
+            try {
+                const response = await fetch(`/api/v1/calendar/events/{{ user.scheduling_slug }}`);
+                const data = await response.json();
+                
+                const eventsContainer = document.getElementById('events-container');
+                
+                if (data.error) {
+                    eventsContainer.innerHTML = `
+                        <div style="text-align: center; padding: 20px; opacity: 0.7;">
+                            <p style="font-size: 14px; color: rgba(255,255,255,0.8);">No calendar events available</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                if (data.events && data.events.length > 0) {
+                    const eventsHtml = data.events.slice(0, 5).map(event => {
+                        const eventDate = new Date(event.date);
+                        const formattedDate = eventDate.toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric',
+                            weekday: 'short'
+                        });
+                        
+                        return `
+                            <div style="background: rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; margin-bottom: 8px; border-left: 3px solid rgba(255,255,255,0.3);">
+                                <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px; opacity: 0.9;">${event.title}</div>
+                                <div style="font-size: 12px; opacity: 0.7;">${formattedDate} • ${event.start_time} - ${event.end_time}</div>
+                                ${event.location ? `<div style="font-size: 11px; opacity: 0.6; margin-top: 2px;">📍 ${event.location}</div>` : ''}
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    eventsContainer.innerHTML = eventsHtml;
+                } else {
+                    eventsContainer.innerHTML = `
+                        <div style="text-align: center; padding: 20px; opacity: 0.7;">
+                            <p style="font-size: 14px; color: rgba(255,255,255,0.8);">No upcoming events</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading calendar events:', error);
+                const eventsContainer = document.getElementById('events-container');
+                eventsContainer.innerHTML = `
+                    <div style="text-align: center; padding: 20px; opacity: 0.7;">
+                        <p style="font-size: 14px; color: rgba(255,255,255,0.8);">Unable to load events</p>
+                    </div>
+                `;
+            }
         },
         async selectDate(day) {
             if (!day.isAvailable) return;
