@@ -185,7 +185,115 @@
         color: white;
         font-size: 16px;
     }
+
+    /* Loader Styles */
+    .loader-container {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(30, 60, 114, 0.8);
+        backdrop-filter: blur(4px);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .loader {
+        background: white;
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        text-align: center;
+        max-width: 320px;
+        width: 90%;
+    }
+
+    .loader-spinner {
+        width: 48px;
+        height: 48px;
+        border: 4px solid #e5e7eb;
+        border-top: 4px solid #1e3c72;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 16px;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .loader-text {
+        color: #1e293b;
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .loader-subtext {
+        color: #64748b;
+        font-size: 14px;
+    }
+
+    /* HTMX Loading States */
+    .htmx-request .loader-container {
+        display: flex;
+    }
+
+    .htmx-request .content-area {
+        opacity: 0.3;
+        pointer-events: none;
+    }
+
+    /* Modal Loader */
+    .modal-loader {
+        display: none;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 10;
+    }
+
+    .modal-loader .loader-spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid #e5e7eb;
+        border-top: 3px solid #1e3c72;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 8px;
+    }
+
+    .modal-loader .loader-text {
+        color: #1e293b;
+        font-size: 14px;
+        font-weight: 500;
+        text-align: center;
+    }
+
+    /* Modal Loading State */
+    #booking-modal.htmx-request .modal-loader {
+        display: block;
+    }
+
+    #booking-modal.htmx-request .bg-white {
+        opacity: 0.3;
+        pointer-events: none;
+    }
 </style>
+
+<!-- Loader -->
+<div class="loader-container">
+    <div class="loader">
+        <div class="loader-spinner"></div>
+        <div class="loader-text">Loading bookings...</div>
+        <div class="loader-subtext">Please wait while we fetch your data</div>
+    </div>
+</div>
 
 <div class="main-container">
     <!-- Sidebar -->
@@ -220,7 +328,10 @@
         <div>
             <!-- Filters and Search -->
             <div class="filters-card">
-                <form hx-get="/bookings/api/list" hx-target="#bookings-list" hx-trigger="change from:select, input from:#search-input">
+                <form hx-get="/bookings/api/list" 
+                      hx-target="#bookings-list" 
+                      hx-trigger="change from:select, input from:#search-input"
+                      hx-indicator=".loader-container">
                     <div class="flex flex-wrap items-center gap-3">
                         <div class="flex items-center gap-2">
                             <label class="text-sm font-medium text-black">Status:</label>
@@ -253,11 +364,19 @@
                 </form>
                 
                 <!-- Stats Cards -->
-                <div id="stats-container" class="stats-grid mt-6" hx-get="/bookings/api/stats" hx-trigger="load">
+                <div id="stats-container" 
+                     class="stats-grid mt-6" 
+                     hx-get="/bookings/api/stats" 
+                     hx-trigger="load"
+                     hx-indicator=".loader-container">
                 </div>
                 
                 <!-- Bookings List -->
-                <div id="bookings-list" class="mt-6" hx-get="/bookings/api/list?v={{ range(1, 1000) | random }}" hx-trigger="load">
+                <div id="bookings-list" 
+                     class="mt-6" 
+                     hx-get="/bookings/api/list?v={{ range(1, 1000) | random }}" 
+                     hx-trigger="load"
+                     hx-indicator=".loader-container">
                 </div>
                 
                 <!-- Fallback script to ensure content loads on refresh -->
@@ -278,4 +397,38 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Container for Booking Details and Forms -->
+<div id="booking-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
+        <!-- Modal content will be loaded here via HTMX -->
+        <div class="modal-loader">
+            <div class="loader-spinner"></div>
+            <div class="loader-text">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Handle modal display
+    document.addEventListener('htmx:afterSwap', function(event) {
+        if (event.target.id === 'booking-modal') {
+            document.getElementById('booking-modal').classList.remove('hidden');
+        }
+    });
+
+    // Close modal when clicking outside
+    document.getElementById('booking-modal').addEventListener('click', function(event) {
+        if (event.target === this) {
+            this.classList.add('hidden');
+        }
+    });
+
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            document.getElementById('booking-modal').classList.add('hidden');
+        }
+    });
+</script>
 {% endblock %} 

@@ -9,60 +9,23 @@ from app.schemas.schemas import AvailabilitySlotCreate, AvailabilitySlotUpdate
 
 
 def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id: int) -> dict:
-    """Create a new availability slot for a user with Google Calendar integration."""
+    """Create a new availability slot for a user."""
     try:
-        # Get user to check Google Calendar connection
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
-            return {"success": False, "message": "User not found"}
+            return {
+                "success": False,
+                "message": "User not found",
+                "slot": None,
+                "calendar_created": False,
+                "calendar_error": None,
+                "google_event_id": None
+            }
         
-        # Check Google Calendar conditions first before creating anything
+        # Check if user has Google Calendar connected
         if user.google_calendar_connected and user.google_access_token and user.google_refresh_token:
             try:
-                # Ensure tokens are valid using token refresh service
-                from app.services.token_refresh_service import get_token_refresh_service
-                token_service = get_token_refresh_service(db)
-                
-                # Ensure tokens are valid
-                token_status = token_service.ensure_valid_tokens(user)
-                if token_status["success"]:
-                    # Use the refreshed tokens
-                    user.google_access_token = token_status["access_token"]
-                    user.google_refresh_token = token_status["refresh_token"]
-                    print(f"✅ Tokens refreshed automatically for {user.email}")
-                else:
-                    print(f"⚠️  Token refresh failed for {user.email}: {token_status['message']}")
-                    if token_status.get("requires_reconnection"):
-                        print(f"   User {user.email} needs to reconnect Google Calendar")
-                        return {
-                            "success": False,
-                            "message": "Couldn't add slot. Please reconnect your calendar in Settings.",
-                            "slot": None,
-                            "calendar_created": False,
-                            "calendar_error": "Token refresh failed",
-                            "google_event_id": None
-                        }
-                
-                # Test calendar access directly using OAuth service
-                from app.services.oauth_service import get_oauth_service
-                oauth_service = get_oauth_service()
-                
-                # Test if we can access user info (basic token validation)
-                try:
-                    user_info = oauth_service.get_user_info(user.google_access_token)
-                    print(f"✅ Token validation successful for {user.email}")
-                except Exception as token_error:
-                    print(f"⚠️  Token validation failed: {token_error}")
-                    return {
-                        "success": False,
-                        "message": "Couldn't add slot. Please reconnect your calendar in Settings.",
-                        "slot": None,
-                        "calendar_created": False,
-                        "calendar_error": "Invalid tokens",
-                        "google_event_id": None
-                    }
-                
-                # Now create calendar service with refreshed tokens
+                # Test calendar connection first
                 from app.services.google_calendar_service import GoogleCalendarService
                 calendar_service = GoogleCalendarService(
                     access_token=user.google_access_token,
@@ -138,15 +101,12 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
                 db.rollback()
                 return {
                     "success": False,
-                    "message": "Couldn't add slot. Please reconnect your calendar in Settings.",
+                    "message": "Couldn't add slot. Google Calendar error.",
                     "slot": None,
                     "calendar_created": False,
                     "calendar_error": str(e),
                     "google_event_id": None
                 }
-        else:
-            # No Google Calendar connected
-            calendar_created = None
         
         return {
             "success": True,
@@ -158,14 +118,11 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
         }
         
     except Exception as e:
-        # Rollback database changes if any error occurs
-        db.rollback()
-        print(f"Error creating availability slot: {e}")
         return {
             "success": False,
             "message": f"Failed to create availability slot: {str(e)}",
             "slot": None,
-            "calendar_created": None,
+            "calendar_created": False,
             "calendar_error": str(e),
             "google_event_id": None
         }
