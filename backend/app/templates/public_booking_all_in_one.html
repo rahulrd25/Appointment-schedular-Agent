@@ -18,7 +18,7 @@
     }
 
     .container {
-        max-width: 1200px;
+        max-width: 1000px;
         margin: 0 auto;
         background: white;
         border-radius: 16px;
@@ -26,7 +26,7 @@
         overflow: hidden;
         display: grid;
         grid-template-columns: 1fr 1fr;
-        min-height: 600px;
+        min-height: 500px;
         position: absolute;
         top: 50%;
         left: 50%;
@@ -36,7 +36,7 @@
     .left-panel {
         background: linear-gradient(135deg, {{ user.theme_color or '#1e3c72' }} 0%, {{ user.accent_color or '#2a5298' }} 100%);
         color: white;
-        padding: 40px;
+        padding: 30px;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -73,7 +73,7 @@
     }
 
     .right-panel {
-        padding: 40px;
+        padding: 30px;
         background: #fafbfc;
     }
 
