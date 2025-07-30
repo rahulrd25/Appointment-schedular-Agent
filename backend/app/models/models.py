@@ -24,6 +24,15 @@ class User(Base):
     google_calendar_email = Column(String, nullable=True)  # Email of the Google account used for calendar
     scheduling_slug = Column(String, unique=True, index=True)  # For shareable booking links
     timezone = Column(String, default='UTC')  # User's timezone (e.g., 'America/New_York', 'Europe/London')
+    
+    # Personalization fields
+    profile_image_url = Column(String, nullable=True)  # URL to profile image
+    meeting_title = Column(String, default='30 Minute Meeting')  # Custom meeting title
+    meeting_description = Column(String, nullable=True)  # Custom meeting description
+    meeting_duration = Column(Integer, default=30)  # Meeting duration in minutes
+    theme_color = Column(String, default='#1e3c72')  # Primary theme color
+    accent_color = Column(String, default='#2a5298')  # Secondary accent color
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

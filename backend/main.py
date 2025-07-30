@@ -1,7 +1,7 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from fastapi import FastAPI, Request, Form, HTTPException, Depends, Query
+from fastapi import FastAPI, Request, Form, HTTPException, Depends, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -11,6 +11,7 @@ import requests
 import json
 import pytz
 import asyncio
+from typing import Any
 
 # Load environment variables from .env file if it exists
 env_file = Path(".env")
@@ -40,18 +41,18 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
 
-# Define agent routes early to avoid conflicts
+# Define dashboard routes early to avoid conflicts
 @app.get("/agent")
 async def agent_redirect(request: Request):
-    """Redirect /agent to /agent/ preserving query parameters"""
+    """Redirect /agent to /dashboard preserving query parameters"""
     query_string = request.url.query
-    redirect_url = f"/agent/{'?' + query_string if query_string else ''}"
+    redirect_url = f"/dashboard{'?' + query_string if query_string else ''}"
     return RedirectResponse(url=redirect_url, status_code=302)
 
-@app.get("/agent/")
-async def agent_chat(request: Request, db: Session = Depends(get_db)):
-    """AI Agent Chat Interface"""
-    print("Agent route accessed!")
+@app.get("/dashboard")
+async def dashboard(request: Request, db: Session = Depends(get_db)):
+    """Dashboard Interface"""
+    print("Dashboard route accessed!")
     access_token = request.cookies.get("access_token")
 
     if not access_token:
@@ -68,13 +69,13 @@ async def agent_chat(request: Request, db: Session = Depends(get_db)):
         if not user:
             return RedirectResponse(url="/login", status_code=302)
 
-        return templates.TemplateResponse("agent_chat.html", {
+        return templates.TemplateResponse("dashboard.html", {
             "request": request,
             "current_user": user
         })
 
     except Exception as e:
-        print(f"Agent chat error: {e}")
+        print(f"Dashboard error: {e}")
         return RedirectResponse(url="/login", status_code=302)
 
 # CORS middleware
@@ -88,6 +89,7 @@ app.add_middleware(
 
 # Static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
@@ -208,8 +210,8 @@ async def google_auth_callback_api(
                 'scope': scope
             }
             
-            # Redirect to dashboard with connection ID
-            return RedirectResponse(url=f"/agent?calendar_connection_id={connection_id}", status_code=302)
+            # Redirect to agent dashboard with connection ID
+            return RedirectResponse(url=f"/dashboard?calendar_connection_id={connection_id}", status_code=302)
         
         else:
             # Regular signup flow
@@ -243,8 +245,8 @@ async def google_auth_callback_api(
             # Create access token for our app
             jwt_token = create_access_token(data={"sub": user.email})
             
-            # Redirect to agent page with cookie
-            response = RedirectResponse(url="/agent/", status_code=302)
+            # Redirect to dashboard page with cookie
+            response = RedirectResponse(url="/dashboard", status_code=302)
             response.set_cookie(
                 key="access_token",
                 value=jwt_token,
@@ -284,7 +286,7 @@ async def login_post(
         
         # Create response with redirect
         response = HTMLResponse(
-            '<div class="text-green-600 text-sm">Login successful! Redirecting...</div><script>setTimeout(() => window.location.href = "/agent/", 1000);</script>'
+            '<div class="text-green-600 text-sm">Login successful! Redirecting...</div><script>setTimeout(() => window.location.href = "/dashboard", 1000);</script>'
         )
         
         # Set HTTP-only cookie
@@ -379,10 +381,7 @@ async def logout():
     response.delete_cookie("access_token")
     return response
 
-@app.get("/dashboard")
-async def dashboard(request: Request, db: Session = Depends(get_db)):
-    # Dashboard is now hidden for users
-    raise HTTPException(status_code=404, detail="Not Found")
+
 
 @app.get("/")
 async def root(request: Request):
@@ -452,6 +451,7 @@ async def complete_calendar_connection(request: Request, connection_id: str = Fo
         user.google_calendar_email = connection_data['calendar_email']
         
         db.commit()
+        print(f"Calendar connected for user {user.email}")
         
         # Clean up the temporary connection data
         del app.state.pending_calendar_connections[connection_id]
@@ -842,365 +842,6 @@ async def add_bulk_availability_slots(
     except Exception as e:
         print(f"Bulk slots API error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
-
-
-@app.post("/dashboard/api/calendar/sync")
-async def sync_calendar_availability_endpoint(request: Request, db: Session = Depends(get_db)):
-    """Sync availability slots with Google Calendar."""
-    import asyncio
-    
-    access_token = request.cookies.get("access_token")
-    if not access_token:
-        return {"success": False, "message": "Not authenticated"}
-    
-    try:
-        payload = verify_token(access_token)
-        if not payload:
-            return {"success": False, "message": "Invalid token"}
-        
-        user_email = payload.get("sub")
-        user = get_user_by_email(db, user_email)
-        if not user:
-            return {"success": False, "message": "User not found"}
-        
-        if not user.google_calendar_connected:
-            return {"success": False, "message": "Google Calendar not connected"}
-        
-        from app.services.availability_service import sync_calendar_availability
-        
-        # Add timeout to prevent hanging
-        try:
-            # Run sync with timeout
-            result = await asyncio.wait_for(
-                asyncio.to_thread(sync_calendar_availability, db, user),
-                timeout=30.0  # 30 second timeout
-            )
-            return result
-        except asyncio.TimeoutError:
-            return {"success": False, "message": "Sync timed out. Please try again."}
-        
-    except Exception as e:
-        print(f"Calendar sync error: {e}")
-        return {"success": False, "message": f"Failed to sync calendar: {str(e)}"}
-
-@app.post("/dashboard/api/calendar/refresh-tokens")
-async def refresh_calendar_tokens_endpoint(request: Request, db: Session = Depends(get_db)):
-    """Proactively refresh Google Calendar tokens."""
-    access_token = request.cookies.get("access_token")
-    if not access_token:
-        return {"success": False, "message": "Not authenticated"}
-    
-    try:
-        payload = verify_token(access_token)
-        if not payload:
-            return {"success": False, "message": "Invalid token"}
-        
-        user_email = payload.get("sub")
-        user = get_user_by_email(db, user_email)
-        if not user:
-            return {"success": False, "message": "User not found"}
-        
-        from app.services.availability_service import refresh_google_tokens
-        result = refresh_google_tokens(db, user)
-        
-        return result
-        
-    except Exception as e:
-        print(f"Token refresh error: {e}")
-        return {"success": False, "message": f"Failed to refresh tokens: {str(e)}"}
-
-@app.exception_handler(404)
-async def not_found_handler(request: Request, exc):
-    """Handle 404 errors"""
-    return templates.TemplateResponse(
-        "404.html", 
-        {"request": request}, 
-        status_code=404
-    )
-
-@app.exception_handler(500)
-async def internal_error_handler(request: Request, exc):
-    """Handle 500 errors"""
-    return templates.TemplateResponse(
-        "500.html", 
-        {"request": request}, 
-        status_code=500
-    )
-
-@app.get("/bookings")
-async def bookings_page(request: Request, db: Session = Depends(get_db)):
-    """Bookings management page for viewing and managing appointments"""
-    access_token = request.cookies.get("access_token")
-
-    if not access_token:
-        return RedirectResponse(url="/login", status_code=302)
-
-    try:
-        payload = verify_token(access_token)
-        if not payload:
-            return RedirectResponse(url="/login", status_code=302)
-
-        user_email = payload.get("sub")
-        user = get_user_by_email(db, user_email)
-
-        if not user:
-            return RedirectResponse(url="/login", status_code=302)
-
-        return templates.TemplateResponse("bookings.html", {
-            "request": request,
-            "current_user": user
-        })
-
-    except Exception as e:
-        print(f"Bookings page error: {e}")
-        return RedirectResponse(url="/login", status_code=302)
-
-
-@app.get("/bookings/api/list")
-async def get_bookings_list(
-    request: Request,
-    status: str = Query(None),
-    search: str = Query(None),
-    time: str = Query(None),
-    db: Session = Depends(get_db)
-):
-    """Get bookings for the authenticated user with optional filtering"""
-    access_token = request.cookies.get("access_token")
-
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    try:
-        payload = verify_token(access_token)
-        if not payload:
-            raise HTTPException(status_code=401, detail="Invalid token")
-
-        user_email = payload.get("sub")
-        user = get_user_by_email(db, user_email)
-
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
-
-        # Import booking service
-        from app.services.booking_service import get_bookings_for_user
-        
-        # Get bookings with optional filtering
-        bookings = get_bookings_for_user(db, user.id, status)
-        
-        # Apply time filter if provided
-        if time:
-            from datetime import datetime, timedelta
-            now = datetime.utcnow()
-            
-            if time == "today":
-                # Filter for bookings today
-                today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                today_end = today_start + timedelta(days=1)
-                bookings = [
-                    booking for booking in bookings
-                    if today_start <= booking.start_time < today_end
-                ]
-            elif time == "week":
-                # Filter for bookings this week (Monday to Sunday)
-                days_since_monday = now.weekday()
-                week_start = now - timedelta(days=days_since_monday)
-                week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
-                week_end = week_start + timedelta(days=7)
-                bookings = [
-                    booking for booking in bookings
-                    if week_start <= booking.start_time < week_end
-                ]
-            elif time == "month":
-                # Filter for bookings this month
-                month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-                if now.month == 12:
-                    month_end = now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-                else:
-                    month_end = now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
-                bookings = [
-                    booking for booking in bookings
-                    if month_start <= booking.start_time < month_end
-                ]
-            elif time == "past":
-                # Filter for past bookings
-                bookings = [
-                    booking for booking in bookings
-                    if booking.start_time < now
-                ]
-        
-        # Apply search filter if provided
-        if search:
-            search_lower = search.lower()
-            bookings = [
-                booking for booking in bookings
-                if search_lower in booking.guest_name.lower() or 
-                   search_lower in booking.guest_email.lower()
-            ]
-
-        # Format bookings for display and sort by date (newest first)
-        formatted_bookings = []
-        for booking in bookings:
-            formatted_bookings.append({
-                "id": booking.id,
-                "guest_name": booking.guest_name,
-                "guest_email": booking.guest_email,
-                "start_time": booking.start_time.strftime("%B %d, %Y at %I:%M %p"),
-                "end_time": booking.end_time.strftime("%I:%M %p"),
-                "status": booking.status,
-                "guest_message": booking.guest_message,
-                "created_at": booking.created_at.strftime("%B %d, %Y"),
-                "sort_date": booking.start_time  # Add sort date for proper sorting
-            })
-        
-        # Sort by start_time (newest first)
-        formatted_bookings.sort(key=lambda x: x["sort_date"], reverse=True)
-
-        return HTMLResponse(
-            templates.get_template("bookings_list.html").render({
-                "request": request,
-                "bookings": formatted_bookings
-            })
-        )
-
-    except Exception as e:
-        print(f"Get bookings error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to load bookings")
-
-
-@app.get("/bookings/api/stats")
-async def get_bookings_stats(
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    """Get booking statistics for the authenticated user"""
-    access_token = request.cookies.get("access_token")
-
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    try:
-        payload = verify_token(access_token)
-        if not payload:
-            raise HTTPException(status_code=401, detail="Invalid token")
-
-        user_email = payload.get("sub")
-        user = get_user_by_email(db, user_email)
-
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
-
-        from app.services.booking_service import get_bookings_for_user
-        from datetime import datetime, timezone
-        
-        bookings = get_bookings_for_user(db, user.id)
-        
-        total = len(bookings)
-        confirmed = len([b for b in bookings if b.status == 'confirmed'])
-        cancelled = len([b for b in bookings if b.status == 'cancelled'])
-        upcoming = len([b for b in bookings if b.start_time > datetime.now(timezone.utc) and b.status == 'confirmed'])
-
-        return templates.TemplateResponse("booking_stats.html", {
-            "request": request,
-            "total": total,
-            "confirmed": confirmed,
-            "cancelled": cancelled,
-            "upcoming": upcoming
-        })
-
-    except Exception as e:
-        print(f"Get booking stats error: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Failed to load booking statistics: {str(e)}")
-
-
-@app.get("/bookings/api/{booking_id}")
-async def get_booking_details(
-    booking_id: int,
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    """Get detailed information for a specific booking"""
-    access_token = request.cookies.get("access_token")
-
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    try:
-        payload = verify_token(access_token)
-        if not payload:
-            raise HTTPException(status_code=401, detail="Invalid token")
-
-        user_email = payload.get("sub")
-        user = get_user_by_email(db, user_email)
-
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
-
-        # Import booking service
-        from app.services.booking_service import get_booking
-        
-        booking = get_booking(db, booking_id, user.id)
-        if not booking:
-            raise HTTPException(status_code=404, detail="Booking not found")
-
-        return {
-            "id": booking.id,
-            "guest_name": booking.guest_name,
-            "guest_email": booking.guest_email,
-            "start_time": booking.start_time.strftime("%B %d, %Y at %I:%M %p"),
-            "end_time": booking.end_time.strftime("%I:%M %p"),
-            "status": booking.status,
-            "guest_message": booking.guest_message,
-            "created_at": booking.created_at.strftime("%B %d, %Y")
-        }
-
-    except Exception as e:
-        print(f"Get booking details error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to load booking details")
-
-
-@app.get("/bookings/api/{booking_id}/cancel-confirmation")
-async def get_cancel_confirmation(
-    booking_id: int,
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    """Show cancel confirmation modal"""
-    access_token = request.cookies.get("access_token")
-
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    try:
-        payload = verify_token(access_token)
-        if not payload:
-            raise HTTPException(status_code=401, detail="Invalid token")
-
-        user_email = payload.get("sub")
-        user = get_user_by_email(db, user_email)
-
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
-
-        # Get the booking
-        from app.services.booking_service import get_booking
-        booking = get_booking(db, booking_id, user.id)
-        if not booking:
-            return templates.TemplateResponse("cancel_success.html", {
-                "request": request,
-                "message": "❌ Booking not found",
-                "status": "failed"
-            })
-
-        return templates.TemplateResponse("cancel_confirmation.html", {
-            "request": request,
-            "booking": booking
-        })
-
-    except Exception as e:
-        print(f"Cancel confirmation error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to load cancel confirmation")
 
 
 @app.post("/bookings/api/{booking_id}/cancel")
@@ -2077,72 +1718,71 @@ async def availability_page(request: Request, db: Session = Depends(get_db)):
         print(f"Availability page error: {e}")
         return RedirectResponse(url="/login", status_code=302)
 
+@app.get("/bookings")
+async def bookings_page(request: Request, db: Session = Depends(get_db)):
+    """Bookings management page for viewing and managing appointments"""
+    access_token = request.cookies.get("access_token")
+
+    if not access_token:
+        return RedirectResponse(url="/login", status_code=302)
+
+    try:
+        payload = verify_token(access_token)
+        if not payload:
+            return RedirectResponse(url="/login", status_code=302)
+
+        user_email = payload.get("sub")
+        user = get_user_by_email(db, user_email)
+
+        if not user:
+            return RedirectResponse(url="/login", status_code=302)
+
+        return templates.TemplateResponse("bookings.html", {
+            "request": request,
+            "current_user": user
+        })
+
+    except Exception as e:
+        print(f"Bookings page error: {e}")
+        return RedirectResponse(url="/login", status_code=302)
+
 # Public booking route - added directly to main app (MUST be last to avoid conflicts)
 @app.get("/{scheduling_slug}", response_class=HTMLResponse)
 async def get_public_booking_page(
     request: Request,
     scheduling_slug: str,
     db: Session = Depends(get_db),
-):
-    """Render the public booking page for a given scheduling slug."""
-    
-    print(f"Catch-all route accessed with slug: {scheduling_slug}")
-    
-    # Exclude certain paths that should not be treated as scheduling slugs
-    excluded_paths = ["agent", "dashboard", "login", "register", "logout", "verify-email", "auth", "bookings", "stats", "availability"]
-    if scheduling_slug in excluded_paths:
-        print(f"Excluded path: {scheduling_slug}")
-        raise HTTPException(status_code=404, detail="Page not found")
-    
-    from app.services.user_service import get_user_by_scheduling_slug
-    from app.services.availability_service import get_available_slots_for_booking
-    
-    user = await get_user_by_scheduling_slug(db, scheduling_slug)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    # Check if user has connected their calendar
-    if not user.google_calendar_connected:
-        return templates.TemplateResponse(
-            "public_booking_unavailable.html", {
-                "request": request, 
-                "user": user,
-                "reason": "calendar_not_connected"
-            }
-        )
-
-    # Get available slots for booking
-    availability_slots = get_available_slots_for_booking(db, user.id)
-    
-    # Filter out slots that conflict with Google Calendar events
-    if user.google_calendar_connected:
-        from app.services.google_calendar_service import GoogleCalendarService
-        try:
-            calendar_service = GoogleCalendarService(
-                access_token=user.google_access_token,
-                refresh_token=user.google_refresh_token
+) -> Any:
+    """Public booking page for a specific user's scheduling link."""
+    try:
+        from app.services.user_service import get_user_by_scheduling_slug
+        user = await get_user_by_scheduling_slug(db, scheduling_slug)
+        
+        if not user:
+            return templates.TemplateResponse("404.html", {"request": request})
+        
+        # Check if user has availability slots (either calendar connected or manual slots)
+        from app.services.availability_service import get_availability_slots_for_user
+        availability_slots = get_availability_slots_for_user(db, user.id)
+        
+        if not availability_slots and not user.google_calendar_connected:
+            return templates.TemplateResponse(
+                "public_booking_unavailable.html", {
+                    "request": request, 
+                    "user": user,
+                    "reason": "no_availability"
+                }
             )
-            
-            # Filter out conflicting slots
-            available_slots = []
-            for slot in availability_slots:
-                # Check if this slot conflicts with any calendar events
-                is_available = calendar_service.check_availability(slot.start_time, slot.end_time)
-                if is_available:
-                    available_slots.append(slot)
-            
-            availability_slots = available_slots
-            
-        except Exception as e:
-            print(f"Error checking calendar conflicts: {e}")
-            # If calendar check fails, show all slots as available
-
-    return templates.TemplateResponse(
-        "public_booking_all_in_one.html", {
-            "request": request, 
+        
+        # Calendar is connected - show booking page
+        return templates.TemplateResponse("public_booking_all_in_one.html", {
+            "request": request,
             "user": user
-        }
-    )
+        })
+        
+    except Exception as e:
+        print(f"Public booking page error: {e}")
+        return templates.TemplateResponse("500.html", {"request": request})
 
 
 
@@ -2153,21 +1793,20 @@ async def get_available_slots_for_date(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """Get available time slots for a specific date from Google Calendar."""
+    """Get available time slots for a specific date for a user's public booking page."""
     try:
-        # Parse the date
-        from datetime import datetime
-        selected_date = datetime.strptime(date, "%Y-%m-%d")
-        
-        # Get the user by scheduling slug
         from app.services.user_service import get_user_by_scheduling_slug
         user = await get_user_by_scheduling_slug(db, user_slug)
         
         if not user:
             return {"error": "User not found"}
         
-        if not user.google_calendar_connected:
-            return {"error": "Google Calendar not connected"}
+        # Check if user has availability slots or calendar connected
+        from app.services.availability_service import get_availability_slots_for_user
+        availability_slots = get_availability_slots_for_user(db, user.id)
+        
+        if not availability_slots and not user.google_calendar_connected:
+            return {"error": "No availability slots found"}
         
         # Initialize Google Calendar service
         from app.services.google_calendar_service import GoogleCalendarService
@@ -2176,38 +1815,20 @@ async def get_available_slots_for_date(
             refresh_token=user.google_refresh_token
         )
         
-        # Get available slots for the date using user's timezone
+        # Parse the date
         try:
-            # Use user's timezone or default to UTC
-            user_timezone = getattr(user, 'timezone', 'UTC') or 'UTC'
-            
-            available_slots = calendar_service.get_available_slots(
-                selected_date, 
-                duration_minutes=30
-            )
-            
-            # Convert to JSON-serializable format
-            slots_data = []
-            for slot in available_slots:
-                slots_data.append({
-                    "id": f"slot_{slot['start_time']}",
-                    "start_time": slot['start_time'].isoformat(),
-                    "end_time": slot['end_time'].isoformat(),
-                    "start_time_utc": slot['start_time'].isoformat(),
-                    "end_time_utc": slot['end_time'].isoformat(),
-                    "timezone": "UTC"
-                })
-            
-            return slots_data
-            
-        except Exception as calendar_error:
-            print(f"Google Calendar error: {calendar_error}")
-            # Return error when Google Calendar fails - no more demo mode
-            raise HTTPException(
-                status_code=500, 
-                detail=f"Calendar service unavailable: {str(calendar_error)}"
-            )
+            target_date = datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            return {"error": "Invalid date format"}
         
+        # Get available slots from calendar
+        try:
+            available_slots = calendar_service.get_available_slots(target_date)
+            return {"slots": available_slots}
+        except Exception as e:
+            print(f"Error getting available slots: {e}")
+            return {"error": "Failed to get available slots"}
+            
     except Exception as e:
         print(f"Error getting available slots: {e}")
         return {"error": str(e)}
@@ -2533,4 +2154,883 @@ async def change_password(
             '<div class="text-red-600 text-sm">Failed to change password. Please try again.</div>',
             status_code=500
         )
+
+@app.post("/settings/api/personalization")
+async def update_personalization(
+    request: Request,
+    profile_image_url: str = Form(None),
+    meeting_title: str = Form(...),
+    meeting_description: str = Form(...),
+    meeting_duration: int = Form(...),
+    theme_color: str = Form(...),
+    accent_color: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Update personalization settings"""
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        payload = verify_token(access_token)
+        if not payload:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
+        user_email = payload.get("sub")
+        user = get_user_by_email(db, user_email)
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        # Validate meeting duration
+        if meeting_duration < 15 or meeting_duration > 480:
+            return HTMLResponse(
+                '<div class="text-red-600 text-sm">Meeting duration must be between 15 and 480 minutes.</div>',
+                status_code=400
+            )
+        
+        # Update personalization settings
+        # Only update profile_image_url if it's a URL (not a file upload)
+        if profile_image_url and (profile_image_url.startswith('http') or profile_image_url.startswith('/uploads/')):
+            user.profile_image_url = profile_image_url
+        elif not profile_image_url:
+            user.profile_image_url = None
+        
+        user.meeting_title = meeting_title
+        user.meeting_description = meeting_description
+        user.meeting_duration = meeting_duration
+        user.theme_color = theme_color
+        user.accent_color = accent_color
+        db.commit()
+        
+        return HTMLResponse(
+            '<div class="text-green-600 text-sm">Personalization settings updated successfully!</div>',
+            status_code=200
+        )
+        
+    except Exception as e:
+        print(f"Personalization update error: {e}")
+        return HTMLResponse(
+            '<div class="text-red-600 text-sm">Failed to update personalization settings. Please try again.</div>',
+            status_code=500
+        )
+
+@app.post("/settings/api/upload-profile-image")
+async def upload_profile_image(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Upload profile image"""
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        payload = verify_token(access_token)
+        if not payload:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
+        user_email = payload.get("sub")
+        user = get_user_by_email(db, user_email)
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        # Import file upload service
+        from app.services.file_upload_service import save_uploaded_file, delete_file
+        
+        # Delete old profile image if exists
+        if user.profile_image_url and not user.profile_image_url.startswith('http'):
+            delete_file(user.profile_image_url)
+        
+        # Save new file
+        file_path = save_uploaded_file(file, "profile_images")
+        if not file_path:
+            return HTMLResponse(
+                '<div class="text-red-600 text-sm">Failed to upload image. Please try again.</div>',
+                status_code=500
+            )
+        
+        # Update user profile
+        user.profile_image_url = file_path
+        db.commit()
+        
+        return HTMLResponse(
+            f'<div class="text-green-600 text-sm">Profile image uploaded successfully!</div>',
+            status_code=200
+        )
+        
+    except Exception as e:
+        print(f"Profile image upload error: {e}")
+        return HTMLResponse(
+            '<div class="text-red-600 text-sm">Failed to upload image. Please try again.</div>',
+            status_code=500
+        )
+
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc):
+    """Handle 404 errors"""
+    return templates.TemplateResponse(
+        "404.html", 
+        {"request": request}, 
+        status_code=404
+    )
+
+@app.exception_handler(500)
+async def internal_error_handler(request: Request, exc):
+    """Handle 500 errors"""
+    return templates.TemplateResponse(
+        "500.html", 
+        {"request": request}, 
+        status_code=500
+    )
+
+@app.post("/dashboard/api/calendar/refresh-tokens")
+async def refresh_calendar_tokens_endpoint(request: Request, db: Session = Depends(get_db)):
+    """Check calendar connection status."""
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        return {"success": False, "message": "Not authenticated"}
+    
+    try:
+        payload = verify_token(access_token)
+        if not payload:
+            return {"success": False, "message": "Invalid token"}
+        
+        user_email = payload.get("sub")
+        user = get_user_by_email(db, user_email)
+        if not user:
+            return {"success": False, "message": "User not found"}
+        
+        from app.services.availability_service import check_calendar_connection
+        result = check_calendar_connection(db, user)
+        
+        return result
+        
+    except Exception as e:
+        return {"success": False, "message": f"Failed to check calendar connection: {str(e)}"}
+
+@app.get("/dashboard/api/user/status")
+async def get_user_status(request: Request, db: Session = Depends(get_db)):
+    """Check if user exists and calendar connection status."""
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        return {"user_exists": False, "calendar_connected": False}
+    
+    try:
+        payload = verify_token(access_token)
+        if not payload:
+            return {"user_exists": False, "calendar_connected": False}
+        
+        user_email = payload.get("sub")
+        user = get_user_by_email(db, user_email)
+        
+        if not user:
+            return {"user_exists": False, "calendar_connected": False}
+        
+        return {
+            "user_exists": True,
+            "calendar_connected": user.google_calendar_connected and user.google_access_token is not None
+        }
+        
+    except Exception as e:
+        return {"user_exists": False, "calendar_connected": False}
+
+@app.get("/bookings/api/data")
+async def get_bookings_data(request: Request, db: Session = Depends(get_db)):
+    """Get bookings data with calendar integration for the bookings page."""
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        return {"error": "Not authenticated"}
+    
+    try:
+        payload = verify_token(access_token)
+        if not payload:
+            return {"error": "Invalid token"}
+        
+        user_email = payload.get("sub")
+        user = get_user_by_email(db, user_email)
+        
+        if not user:
+            return {"error": "User not found"}
+        
+        # Initialize data structures
+        all_bookings = []
+        
+        # Get user's bookings from database
+        from app.services.booking_service import get_bookings_for_user
+        db_bookings = get_bookings_for_user(db, user.id)
+        
+        # Convert database bookings to bookings format
+        for booking in db_bookings:
+            all_bookings.append({
+                "id": booking.id,
+                "title": booking.guest_name,
+                "date": booking.start_time.strftime("%Y-%m-%d"),
+                "time": booking.start_time.strftime("%H:%M"),
+                "end_time": booking.end_time.strftime("%H:%M"),
+                "email": booking.guest_email,
+                "status": booking.status,
+                "source": "database",
+                "guest_message": booking.guest_message
+            })
+        
+        # If user has Google Calendar connected, get real calendar data
+        if user.google_calendar_connected and user.google_access_token:
+            try:
+                from app.services.google_calendar_service import GoogleCalendarService
+                
+                # Initialize Google Calendar service
+                calendar_service = GoogleCalendarService(
+                    access_token=user.google_access_token,
+                    refresh_token=user.google_refresh_token,
+                    db=db,
+                    user_id=user.id
+                )
+                
+                # Get events from past 30 days to next 30 days
+                start_date = datetime.now() - timedelta(days=30)
+                end_date = datetime.now() + timedelta(days=30)
+                
+                calendar_events = calendar_service.get_events(start_date, end_date)
+                
+                # Process calendar events
+                for event in calendar_events:
+                    event_start = event.get('start', {}).get('dateTime')
+                    event_end = event.get('end', {}).get('dateTime')
+                    
+                    if event_start and event_end:
+                        # Handle timezone-aware datetime parsing
+                        if event_start.endswith('Z'):
+                            event_start_dt = datetime.fromisoformat(event_start.replace('Z', '+00:00'))
+                        else:
+                            event_start_dt = datetime.fromisoformat(event_start)
+                        
+                        if event_end.endswith('Z'):
+                            event_end_dt = datetime.fromisoformat(event_end.replace('Z', '+00:00'))
+                        else:
+                            event_end_dt = datetime.fromisoformat(event_end)
+                        
+                        event_date = event_start_dt.strftime("%Y-%m-%d")
+                        event_start_time = event_start_dt.strftime("%H:%M")
+                        event_end_time = event_end_dt.strftime("%H:%M")
+                        
+                        # Add to all bookings
+                        all_bookings.append({
+                            "id": f"calendar_{event.get('id')}",
+                            "title": event.get('summary', 'Untitled Event'),
+                            "date": event_date,
+                            "time": event_start_time,
+                            "end_time": event_end_time,
+                            "email": event.get('organizer', {}).get('email', ''),
+                            "status": "confirmed",
+                            "source": "calendar",
+                            "calendar_id": event.get('id'),
+                            "description": event.get('description', ''),
+                            "location": event.get('location', ''),
+                            "guest_message": None
+                        })
+                
+            except Exception as e:
+                print(f"Error accessing Google Calendar: {e}")
+                # Continue with database data only
+        
+        # Sort all bookings by date and time
+        all_bookings.sort(key=lambda x: (x['date'], x['time']), reverse=True)
+        
+        return {
+            "bookings": all_bookings,
+            "totalBookings": len(all_bookings),
+            "calendarConnected": user.google_calendar_connected
+        }
+        
+    except Exception as e:
+        print(f"Error in get_bookings_data: {e}")
+        return {"error": str(e)}
+
+@app.get("/bookings/api/stats")
+async def get_bookings_stats(request: Request, db: Session = Depends(get_db)):
+    """Get booking statistics with calendar integration."""
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        return {"error": "Not authenticated"}
+    
+    try:
+        payload = verify_token(access_token)
+        if not payload:
+            return {"error": "Invalid token"}
+        
+        user_email = payload.get("sub")
+        user = get_user_by_email(db, user_email)
+        
+        if not user:
+            return {"error": "User not found"}
+        
+        # Get database bookings
+        from app.services.booking_service import get_bookings_for_user
+        db_bookings = get_bookings_for_user(db, user.id)
+        
+        # Count database bookings by status
+        total_db = len(db_bookings)
+        confirmed_db = len([b for b in db_bookings if b.status == "confirmed"])
+        cancelled_db = len([b for b in db_bookings if b.status == "cancelled"])
+        upcoming_db = len([b for b in db_bookings if b.start_time > datetime.now()])
+        
+        # Get calendar events if connected
+        calendar_events = []
+        if user.google_calendar_connected and user.google_access_token:
+            try:
+                from app.services.google_calendar_service import GoogleCalendarService
+                calendar_service = GoogleCalendarService(
+                    access_token=user.google_access_token,
+                    refresh_token=user.google_refresh_token,
+                    db=db,
+                    user_id=user.id
+                )
+                
+                # Get events from past 30 days to next 30 days
+                start_date = datetime.now() - timedelta(days=30)
+                end_date = datetime.now() + timedelta(days=30)
+                calendar_events = calendar_service.get_events(start_date, end_date)
+                
+            except Exception as e:
+                print(f"Error accessing Google Calendar: {e}")
+        
+        # Count calendar events
+        total_calendar = len(calendar_events)
+        upcoming_calendar = 0
+        for event in calendar_events:
+            event_start = event.get('start', {}).get('dateTime')
+            if event_start:
+                if event_start.endswith('Z'):
+                    event_datetime = datetime.fromisoformat(event_start.replace('Z', '+00:00'))
+                else:
+                    event_datetime = datetime.fromisoformat(event_start)
+                
+                if event_datetime > datetime.now():
+                    upcoming_calendar += 1
+        
+        # Combine totals
+        total_bookings = total_db + total_calendar
+        total_confirmed = confirmed_db + total_calendar  # Calendar events are always confirmed
+        total_cancelled = cancelled_db  # Calendar events can't be cancelled through our system
+        total_upcoming = upcoming_db + upcoming_calendar
+        
+        return HTMLResponse(f"""
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+                    <div class="flex items-center">
+                        <div class="p-6 rounded-full bg-blue-100">
+                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-black">Total Bookings</p>
+                            <p class="text-2xl font-semibold text-black">{total_bookings}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+                    <div class="flex items-center">
+                        <div class="p-6 rounded-full bg-green-100">
+                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-black">Confirmed</p>
+                            <p class="text-2xl font-semibold text-black">{total_confirmed}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
+                    <div class="flex items-center">
+                        <div class="p-6 rounded-full bg-yellow-100">
+                            <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-black">Upcoming</p>
+                            <p class="text-2xl font-semibold text-black">{total_upcoming}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
+                    <div class="flex items-center">
+                        <div class="p-6 rounded-full bg-red-100">
+                            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-black">Cancelled</p>
+                            <p class="text-2xl font-semibold text-black">{total_cancelled}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        """)
+        
+    except Exception as e:
+        print(f"Error in get_bookings_stats: {e}")
+        return {"error": str(e)}
+
+@app.get("/bookings/api/list")
+async def get_bookings_list(request: Request, db: Session = Depends(get_db)):
+    """Get bookings list with calendar integration and filtering."""
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        return {"error": "Not authenticated"}
+    
+    try:
+        payload = verify_token(access_token)
+        if not payload:
+            return {"error": "Invalid token"}
+        
+        user_email = payload.get("sub")
+        user = get_user_by_email(db, user_email)
+        
+        if not user:
+            return {"error": "User not found"}
+        
+        # Get query parameters for filtering
+        status_filter = request.query_params.get("status", "")
+        time_filter = request.query_params.get("time", "")
+        search_filter = request.query_params.get("search", "").lower()
+        
+        # Get database bookings
+        from app.services.booking_service import get_bookings_for_user
+        db_bookings = get_bookings_for_user(db, user.id)
+        
+        # Convert database bookings to list format
+        all_bookings = []
+        for booking in db_bookings:
+            all_bookings.append({
+                "id": booking.id,
+                "title": booking.guest_name,
+                "date": booking.start_time.strftime("%Y-%m-%d"),
+                "time": booking.start_time.strftime("%H:%M"),
+                "end_time": booking.end_time.strftime("%H:%M"),
+                "email": booking.guest_email,
+                "status": booking.status,
+                "source": "database",
+                "guest_message": booking.guest_message,
+                "datetime": booking.start_time
+            })
+        
+        # Get calendar events if connected
+        if user.google_calendar_connected and user.google_access_token:
+            try:
+                from app.services.google_calendar_service import GoogleCalendarService
+                calendar_service = GoogleCalendarService(
+                    access_token=user.google_access_token,
+                    refresh_token=user.google_refresh_token,
+                    db=db,
+                    user_id=user.id
+                )
+                
+                # Get events from past 30 days to next 30 days
+                start_date = datetime.now() - timedelta(days=30)
+                end_date = datetime.now() + timedelta(days=30)
+                calendar_events = calendar_service.get_events(start_date, end_date)
+                
+                # Process calendar events
+                for event in calendar_events:
+                    event_start = event.get('start', {}).get('dateTime')
+                    event_end = event.get('end', {}).get('dateTime')
+                    
+                    if event_start and event_end:
+                        # Handle timezone-aware datetime parsing
+                        if event_start.endswith('Z'):
+                            event_start_dt = datetime.fromisoformat(event_start.replace('Z', '+00:00'))
+                        else:
+                            event_start_dt = datetime.fromisoformat(event_start)
+                        
+                        if event_end.endswith('Z'):
+                            event_end_dt = datetime.fromisoformat(event_end.replace('Z', '+00:00'))
+                        else:
+                            event_end_dt = datetime.fromisoformat(event_end)
+                        
+                        event_date = event_start_dt.strftime("%Y-%m-%d")
+                        event_start_time = event_start_dt.strftime("%H:%M")
+                        event_end_time = event_end_dt.strftime("%H:%M")
+                        
+                        # Add to all bookings
+                        all_bookings.append({
+                            "id": f"calendar_{event.get('id')}",
+                            "title": event.get('summary', 'Untitled Event'),
+                            "date": event_date,
+                            "time": event_start_time,
+                            "end_time": event_end_time,
+                            "email": event.get('organizer', {}).get('email', ''),
+                            "status": "confirmed",
+                            "source": "calendar",
+                            "calendar_id": event.get('id'),
+                            "description": event.get('description', ''),
+                            "location": event.get('location', ''),
+                            "guest_message": None,
+                            "datetime": event_start_dt
+                        })
+                
+            except Exception as e:
+                print(f"Error accessing Google Calendar: {e}")
+        
+        # Apply filters
+        filtered_bookings = all_bookings
+        
+        # Status filter
+        if status_filter:
+            filtered_bookings = [b for b in filtered_bookings if b['status'] == status_filter]
+        
+        # Time filter
+        if time_filter:
+            today = datetime.now().date()
+            if time_filter == "today":
+                filtered_bookings = [b for b in filtered_bookings if b['date'] == today.strftime("%Y-%m-%d")]
+            elif time_filter == "week":
+                week_start = today - timedelta(days=today.weekday())
+                week_end = week_start + timedelta(days=6)
+                filtered_bookings = [b for b in filtered_bookings if week_start.strftime("%Y-%m-%d") <= b['date'] <= week_end.strftime("%Y-%m-%d")]
+            elif time_filter == "month":
+                month_start = today.replace(day=1)
+                if today.month == 12:
+                    month_end = today.replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
+                else:
+                    month_end = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
+                filtered_bookings = [b for b in filtered_bookings if month_start.strftime("%Y-%m-%d") <= b['date'] <= month_end.strftime("%Y-%m-%d")]
+            elif time_filter == "past":
+                filtered_bookings = [b for b in filtered_bookings if b['date'] < today.strftime("%Y-%m-%d")]
+        
+        # Search filter
+        if search_filter:
+            filtered_bookings = [b for b in filtered_bookings if 
+                               search_filter in b['title'].lower() or 
+                               search_filter in b['email'].lower()]
+        
+        # Sort by date and time (newest first)
+        filtered_bookings.sort(key=lambda x: (x['date'], x['time']), reverse=True)
+        
+        # Generate HTML for bookings list
+        if filtered_bookings:
+            bookings_html = ""
+            for booking in filtered_bookings:
+                # Determine status badge
+                status_badge = ""
+                if booking['status'] == "confirmed":
+                    status_badge = '<span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Confirmed</span>'
+                elif booking['status'] == "cancelled":
+                    status_badge = '<span class="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">Cancelled</span>'
+                elif booking['status'] == "rescheduled":
+                    status_badge = '<span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">Rescheduled</span>'
+                
+                # Determine source badge
+                source_badge = ""
+                if booking['source'] == "calendar":
+                    source_badge = '<span class="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full ml-2">Calendar</span>'
+                else:
+                    source_badge = '<span class="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full ml-2">Database</span>'
+                
+                # Format date for display
+                display_date = booking['date']
+                today = datetime.now().date()
+                booking_date = datetime.strptime(booking['date'], "%Y-%m-%d").date()
+                
+                if booking_date == today:
+                    display_date = "Today"
+                elif booking_date == today + timedelta(days=1):
+                    display_date = "Tomorrow"
+                elif booking_date < today:
+                    display_date = f"{booking_date.strftime('%b %d')} (Past)"
+                else:
+                    display_date = booking_date.strftime('%b %d')
+                
+                bookings_html += f"""
+                    <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="flex items-center space-x-2 mb-2">
+                                    <h3 class="text-lg font-semibold text-gray-900">{booking['title']}</h3>
+                                    {status_badge}
+                                    {source_badge}
+                                </div>
+                                <p class="text-sm text-gray-600 mb-1">{display_date} at {booking['time']} - {booking['end_time']}</p>
+                                <p class="text-sm text-gray-500">{booking['email']}</p>
+                                {f'<p class="text-sm text-gray-400 mt-1">{booking["location"]}</p>' if booking.get('location') else ''}
+                                {f'<p class="text-sm text-gray-400 mt-1">{booking["guest_message"]}</p>' if booking.get('guest_message') else ''}
+                            </div>
+                            <div class="flex space-x-2">
+                                {f'<button onclick="viewBookingDetails({booking["id"]})" class="text-blue-600 hover:text-blue-800 text-sm font-medium">View</button>' if booking['source'] == 'database' else ''}
+                                {f'<button onclick="rescheduleBooking({booking["id"]})" class="text-yellow-600 hover:text-yellow-800 text-sm font-medium">Reschedule</button>' if booking['source'] == 'database' else ''}
+                                {f'<button onclick="cancelBooking({booking["id"]})" class="text-red-600 hover:text-red-800 text-sm font-medium">Cancel</button>' if booking['source'] == 'database' else ''}
+                            </div>
+                        </div>
+                    </div>
+                """
+        else:
+            bookings_html = """
+                <div class="text-center py-8">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">No bookings found</h3>
+                    <p class="mt-1 text-sm text-gray-500">No bookings match your current filters.</p>
+                </div>
+            """
+        
+        return HTMLResponse(bookings_html)
+        
+    except Exception as e:
+        print(f"Error in get_bookings_list: {e}")
+        return {"error": str(e)}
+
+@app.get("/dashboard/api/data")
+async def get_dashboard_data(request: Request, db: Session = Depends(get_db)):
+    """Get dashboard data for connected users with real calendar integration."""
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        return {"error": "Not authenticated"}
+    
+    try:
+        payload = verify_token(access_token)
+        if not payload:
+            return {"error": "Invalid token"}
+        
+        user_email = payload.get("sub")
+        user = get_user_by_email(db, user_email)
+        
+        if not user:
+            return {"error": "User not found"}
+        
+        # Initialize data structures
+        upcoming_bookings = []
+        all_bookings = []
+        available_slots = []
+        
+        # Get user's bookings from database
+        from app.services.booking_service import get_bookings_for_user
+        db_bookings = get_bookings_for_user(db, user.id)
+        
+        # Use timezone-aware current time for database comparisons
+        current_time = datetime.now()
+        upcoming_db_bookings = []
+        
+        for booking in db_bookings:
+            # Ensure both times are timezone-aware for comparison
+            booking_time = booking.start_time
+            if booking_time.tzinfo is None:
+                # If booking time is naive, assume UTC
+                booking_time = booking_time.replace(tzinfo=timezone.utc)
+            
+            if current_time.tzinfo is None:
+                # If current time is naive, assume UTC
+                current_time = current_time.replace(tzinfo=timezone.utc)
+            
+            if booking_time > current_time:
+                upcoming_db_bookings.append(booking)
+        
+        # Convert database bookings to dashboard format
+        for booking in upcoming_db_bookings:
+            upcoming_bookings.append({
+                "id": booking.id,
+                "title": booking.guest_name,
+                "date": booking.start_time.strftime("%Y-%m-%d"),
+                "time": booking.start_time.strftime("%H:%M"),
+                "email": booking.guest_email,
+                "source": "database"
+            })
+        
+        for booking in db_bookings:
+            all_bookings.append({
+                "id": booking.id,
+                "title": booking.guest_name,
+                "date": booking.start_time.strftime("%Y-%m-%d"),
+                "time": booking.start_time.strftime("%H:%M"),
+                "email": booking.guest_email,
+                "source": "database"
+            })
+        
+        # If user has Google Calendar connected, get real calendar data
+        if user.google_calendar_connected and user.google_access_token:
+            try:
+                from app.services.google_calendar_service import GoogleCalendarService
+                
+                # Initialize Google Calendar service
+                calendar_service = GoogleCalendarService(
+                    access_token=user.google_access_token,
+                    refresh_token=user.google_refresh_token,
+                    db=db,
+                    user_id=user.id
+                )
+                
+                # Get events from today to next 30 days
+                start_date = datetime.now()
+                end_date = start_date + timedelta(days=30)
+                
+                calendar_events = calendar_service.get_events(start_date, end_date)
+                
+                # Process calendar events
+                for event in calendar_events:
+                    event_start = event.get('start', {}).get('dateTime')
+                    if event_start:
+                        # Handle timezone-aware datetime parsing
+                        if event_start.endswith('Z'):
+                            event_datetime = datetime.fromisoformat(event_start.replace('Z', '+00:00'))
+                        else:
+                            event_datetime = datetime.fromisoformat(event_start)
+                        
+                        # Make current time timezone-aware for comparison
+                        current_time = datetime.now(event_datetime.tzinfo)
+                        
+                        event_date = event_datetime.strftime("%Y-%m-%d")
+                        event_time = event_datetime.strftime("%H:%M")
+                        
+                        # Add to upcoming bookings if it's in the future
+                        if event_datetime > current_time:
+                            upcoming_bookings.append({
+                                "id": f"calendar_{event.get('id')}",
+                                "title": event.get('summary', 'Untitled Event'),
+                                "date": event_date,
+                                "time": event_time,
+                                "email": event.get('organizer', {}).get('email', ''),
+                                "source": "calendar",
+                                "calendar_id": event.get('id'),
+                                "description": event.get('description', ''),
+                                "location": event.get('location', '')
+                            })
+                        
+                        # Add to all bookings
+                        all_bookings.append({
+                            "id": f"calendar_{event.get('id')}",
+                            "title": event.get('summary', 'Untitled Event'),
+                            "date": event_date,
+                            "time": event_time,
+                            "email": event.get('organizer', {}).get('email', ''),
+                            "source": "calendar",
+                            "calendar_id": event.get('id'),
+                            "description": event.get('description', ''),
+                            "location": event.get('location', '')
+                        })
+                
+                # Get available slots for today and tomorrow
+                today = datetime.now().date()
+                tomorrow = today + timedelta(days=1)
+                
+                for date in [today, tomorrow]:
+                    try:
+                        slots = calendar_service.get_available_slots(date, 30)
+                        for slot in slots:
+                            available_slots.append({
+                                "date": date.strftime("%Y-%m-%d"),
+                                "start_time": slot['start_time'].strftime("%H:%M"),
+                                "end_time": slot['end_time'].strftime("%H:%M"),
+                                "duration": 30
+                            })
+                    except Exception as e:
+                        print(f"Error getting available slots for {date}: {e}")
+                        continue
+                
+            except Exception as e:
+                print(f"Error accessing Google Calendar: {e}")
+                # Continue with database data only
+        
+        # Sort upcoming bookings by date and time
+        upcoming_bookings.sort(key=lambda x: (x['date'], x['time']))
+        
+        return {
+            "upcomingBookings": upcoming_bookings,
+            "allBookings": all_bookings,
+            "availableSlots": available_slots,
+            "calendarConnected": user.google_calendar_connected,
+            "totalBookings": len(all_bookings),
+            "upcomingCount": len(upcoming_bookings),
+            "availableCount": len(available_slots)
+        }
+        
+    except Exception as e:
+        print(f"Error in get_dashboard_data: {e}")
+        return {"error": str(e)}
+
+
+
+
+
+
+
+@app.post("/dashboard/api/chat")
+async def chat_with_ai(request: Request, db: Session = Depends(get_db)):
+    """Chat with AI agent using real calendar data."""
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        return {"error": "Not authenticated"}
+    
+    try:
+        payload = verify_token(access_token)
+        if not payload:
+            return {"error": "Invalid token"}
+        
+        body = await request.json()
+        message = body.get("message", "")
+        
+        if not message:
+            return {"error": "No message provided"}
+        
+        user_email = payload.get("sub")
+        user = get_user_by_email(db, user_email)
+        
+        if not user:
+            return {"error": "User not found"}
+        
+        # Get real calendar data for context
+        calendar_context = ""
+        if user.google_calendar_connected and user.google_access_token:
+            try:
+                from app.services.google_calendar_service import GoogleCalendarService
+                calendar_service = GoogleCalendarService(
+                    access_token=user.google_access_token,
+                    refresh_token=user.google_refresh_token,
+                    db=db,
+                    user_id=user.id
+                )
+                
+                # Get today's events
+                today = datetime.now()
+                tomorrow = today + timedelta(days=1)
+                events = calendar_service.get_events(today, tomorrow)
+                
+                if events:
+                    calendar_context = f"You have {len(events)} events today/tomorrow: "
+                    for event in events[:3]:  # Show first 3 events
+                        event_start = event.get('start', {}).get('dateTime')
+                        if event_start:
+                            event_datetime = datetime.fromisoformat(event_start.replace('Z', '+00:00') if event_start.endswith('Z') else event_start)
+                            calendar_context += f"{event.get('summary', 'Untitled')} at {event_datetime.strftime('%H:%M')}, "
+                    calendar_context = calendar_context.rstrip(", ")
+                else:
+                    calendar_context = "You have no events scheduled for today or tomorrow."
+                    
+            except Exception as e:
+                calendar_context = "I can't access your calendar right now."
+        
+        # Generate intelligent response based on message and calendar context
+        message_lower = message.lower()
+        
+        if any(word in message_lower for word in ['schedule', 'book', 'appointment', 'meeting']):
+            response = f"I can help you schedule appointments! {calendar_context} What type of meeting would you like to schedule?"
+        elif any(word in message_lower for word in ['availability', 'free', 'when', 'time']):
+            response = f"Let me check your availability for you. {calendar_context} When would you like to check availability for?"
+        elif any(word in message_lower for word in ['today', 'tomorrow', 'events', 'meetings']):
+            response = f"Here's what's on your schedule: {calendar_context}"
+        elif any(word in message_lower for word in ['cancel', 'reschedule']):
+            response = f"I can help you cancel or reschedule meetings. {calendar_context} Which meeting would you like to modify?"
+        else:
+            response = f"I'm your AI scheduling assistant! {calendar_context} How can I help you with your schedule today?"
+        
+        return {"response": response}
+        
+    except Exception as e:
+        return {"error": str(e)}
 
