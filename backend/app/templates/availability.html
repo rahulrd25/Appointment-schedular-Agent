@@ -751,6 +751,128 @@
     .close:hover {
         background-color: rgba(255, 255, 255, 0.2);
     }
+
+    /* Disabled Days */
+    .flatpickr-day.disabled {
+        color: #d1d5db !important;
+    }
+
+    /* Quick Availability Selection Styles */
+    .quick-time-slot, .quick-day-slot {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 12px;
+        background: white;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 12px;
+        font-weight: 500;
+        color: #374151;
+        position: relative;
+        overflow: hidden;
+        min-height: 40px;
+        width: 100%;
+        text-align: center;
+    }
+
+    .quick-time-slot {
+        min-width: 80px;
+        height: 40px;
+        flex-shrink: 0;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    .quick-day-slot {
+        min-width: 100px;
+        height: 40px;
+        flex-shrink: 0;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    .quick-time-slot:hover, .quick-day-slot:hover {
+        border-color: #3b82f6;
+        background: #f0f9ff;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+    }
+
+    .quick-time-slot input[type="checkbox"], .quick-day-slot input[type="checkbox"] {
+        position: absolute;
+        opacity: 0;
+        cursor: pointer;
+        height: 0;
+        width: 0;
+    }
+
+    .quick-time-slot input[type="checkbox"]:checked + .slot-label,
+    .quick-day-slot input[type="checkbox"]:checked + .day-label {
+        color: white;
+        font-weight: 600;
+    }
+
+    .quick-time-slot input[type="checkbox"]:checked ~ .slot-label,
+    .quick-day-slot input[type="checkbox"]:checked ~ .day-label {
+        color: white;
+        font-weight: 600;
+    }
+
+    .quick-time-slot input[type="checkbox"]:checked,
+    .quick-day-slot input[type="checkbox"]:checked {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    }
+
+    .quick-time-slot:has(input[type="checkbox"]:checked),
+    .quick-day-slot:has(input[type="checkbox"]:checked) {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        border-color: #1e3c72;
+        color: white;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(30, 60, 114, 0.2);
+    }
+
+    .slot-label, .day-label {
+        pointer-events: none;
+        user-select: none;
+        transition: all 0.2s ease;
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 1;
+    }
+
+    /* Loading State for Quick Availability */
+    .quick-availability-loading {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+
+    .quick-availability-loading::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 16px;
+        height: 16px;
+        margin: -8px 0 0 -8px;
+        border: 2px solid #3b82f6;
+        border-top: 2px solid transparent;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
 </style>
 {% endblock %}
 
@@ -791,277 +913,312 @@
             <!-- Main Layout -->
             <div class="max-w-7xl mx-auto">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" style="margin-top: 30px;">
-                    <!-- Add Slot Card - Always Visible -->
-                    <div class="form-card">
-                        <div class="mb-6">
-                            <div class="flex items-center justify-between">
-                                <h2 class="text-xl font-semibold text-gray-900">Add New Slot</h2>
-                            </div>
-                        </div>
-                        
-                        <form hx-post="/dashboard/api/availability/" hx-target="#availability-list" hx-swap="beforeend" class="space-y-6">
-                            <div id="form-error" class="text-red-500 text-sm mb-4 hidden" style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 12px; padding: 12px;">
-                                <div class="flex items-center">
-                                    <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                    <!-- Left Side - Quick Setup and My Availability -->
+                    <div class="space-y-6">
+                        <!-- Quick Setup Card -->
+                        <div class="bg-white rounded-lg shadow-md p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-800 mb-1">Quick Setup</h3>
+                                    <p class="text-sm text-gray-600">Select your preferred time slots and days for the next 1 week</p>
+                                </div>
+                                <button type="button" onclick="applyQuickAvailability()" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                                     </svg>
-                                    Please select all fields first
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="date" class="form-label">📅 Date</label>
-                                <input type="text" id="date" name="date" required class="form-input" placeholder="Select date">
+                                    <span>Apply Selected</span>
+                                </button>
                             </div>
                             
-                            <div class="form-group">
-                                <label for="start_time" class="form-label">⏰ Start Time</label>
-                                <div class="relative">
-                                    <input type="hidden" id="start_time" name="start_time" value="" required>
-                                    <button type="button" id="time-dropdown-trigger" class="form-input text-left flex justify-between items-center">
-                                        <span id="selected-time-display">Select time</span>
-                                        <svg class="w-5 h-5 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                        </svg>
-                                    </button>
-                                    <div id="time-dropdown-menu" class="absolute z-50 w-full mt-1 bg-white border-2 border-gray-200 rounded-lg shadow-lg max-h-32 overflow-y-auto hidden">
-                                        <div class="p-2">
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="07:00" data-display="7:00 AM">7:00 AM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="07:30" data-display="7:30 AM">7:30 AM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="08:00" data-display="8:00 AM">8:00 AM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="08:30" data-display="8:30 AM">8:30 AM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="09:00" data-display="9:00 AM">9:00 AM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="09:30" data-display="9:30 AM">9:30 AM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="10:00" data-display="10:00 AM">10:00 AM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="10:30" data-display="10:30 AM">10:30 AM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="11:00" data-display="11:00 AM">11:00 AM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="11:30" data-display="11:30 AM">11:30 AM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="12:00" data-display="12:00 PM">12:00 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="12:30" data-display="12:30 PM">12:30 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="13:00" data-display="1:00 PM">1:00 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="13:30" data-display="1:30 PM">1:30 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="14:00" data-display="2:00 PM">2:00 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="14:30" data-display="2:30 PM">2:30 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="15:00" data-display="3:00 PM">3:00 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="15:30" data-display="3:30 PM">3:30 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="16:00" data-display="4:00 PM">4:00 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="16:30" data-display="4:30 PM">4:30 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="17:00" data-display="5:00 PM">5:00 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="17:30" data-display="5:30 PM">5:30 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="18:00" data-display="6:00 PM">6:00 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="18:30" data-display="6:30 PM">6:30 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="19:00" data-display="7:00 PM">7:00 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="19:30" data-display="7:30 PM">7:30 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="20:00" data-display="8:00 PM">8:00 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="20:30" data-display="8:30 PM">8:30 PM</div>
-                                            <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="21:00" data-display="9:00 PM">9:00 PM</div>
-                                        </div>
+                            <!-- Quick Action Buttons -->
+                            <div class="flex space-x-4 mb-4">
+                                <button type="button" onclick="selectAllTimeSlots()" class="text-xs text-blue-600 hover:text-blue-800 font-medium">
+                                    Select All Times
+                                </button>
+                                <button type="button" onclick="selectAllDays()" class="text-xs text-blue-600 hover:text-blue-800 font-medium">
+                                    Select All Days
+                                </button>
+                                <button type="button" onclick="clearAllSelections()" class="text-xs text-gray-600 hover:text-gray-800 font-medium">
+                                    Clear All
+                                </button>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-8">
+                                <!-- Time Slots Column -->
+                                <div>
+                                    <h4 class="text-sm font-medium text-gray-700 mb-4">Time Slots</h4>
+                                    <div class="grid grid-cols-3 gap-3">
+                                        <label class="quick-time-slot">
+                                            <input type="checkbox" class="time-slot-checkbox" value="08:00" data-display="8:00 AM">
+                                            <span class="slot-label">8:00 AM</span>
+                                        </label>
+                                        <label class="quick-time-slot">
+                                            <input type="checkbox" class="time-slot-checkbox" value="09:00" data-display="9:00 AM">
+                                            <span class="slot-label">9:00 AM</span>
+                                        </label>
+                                        <label class="quick-time-slot">
+                                            <input type="checkbox" class="time-slot-checkbox" value="10:00" data-display="10:00 AM">
+                                            <span class="slot-label">10:00 AM</span>
+                                        </label>
+                                        <label class="quick-time-slot">
+                                            <input type="checkbox" class="time-slot-checkbox" value="11:00" data-display="11:00 AM">
+                                            <span class="slot-label">11:00 AM</span>
+                                        </label>
+                                        <label class="quick-time-slot">
+                                            <input type="checkbox" class="time-slot-checkbox" value="12:00" data-display="12:00 PM">
+                                            <span class="slot-label">12:00 PM</span>
+                                        </label>
+                                        <label class="quick-time-slot">
+                                            <input type="checkbox" class="time-slot-checkbox" value="13:00" data-display="1:00 PM">
+                                            <span class="slot-label">1:00 PM</span>
+                                        </label>
+                                        <label class="quick-time-slot">
+                                            <input type="checkbox" class="time-slot-checkbox" value="14:00" data-display="2:00 PM">
+                                            <span class="slot-label">2:00 PM</span>
+                                        </label>
+                                        <label class="quick-time-slot">
+                                            <input type="checkbox" class="time-slot-checkbox" value="15:00" data-display="3:00 PM">
+                                            <span class="slot-label">3:00 PM</span>
+                                        </label>
+                                        <label class="quick-time-slot">
+                                            <input type="checkbox" class="time-slot-checkbox" value="16:00" data-display="4:00 PM">
+                                            <span class="slot-label">4:00 PM</span>
+                                        </label>
+                                        <label class="quick-time-slot">
+                                            <input type="checkbox" class="time-slot-checkbox" value="17:00" data-display="5:00 PM">
+                                            <span class="slot-label">5:00 PM</span>
+                                        </label>
+                                        <label class="quick-time-slot">
+                                            <input type="checkbox" class="time-slot-checkbox" value="18:00" data-display="6:00 PM">
+                                            <span class="slot-label">6:00 PM</span>
+                                        </label>
+                                        <label class="quick-time-slot">
+                                            <input type="checkbox" class="time-slot-checkbox" value="19:00" data-display="7:00 PM">
+                                            <span class="slot-label">7:00 PM</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Days Selection Column -->
+                                <div>
+                                    <h4 class="text-sm font-medium text-gray-700 mb-4">Days of the Week</h4>
+                                    <div class="grid grid-cols-1 gap-3">
+                                        <label class="quick-day-slot">
+                                            <input type="checkbox" class="day-checkbox" value="1" data-day="Monday">
+                                            <span class="day-label">Monday</span>
+                                        </label>
+                                        <label class="quick-day-slot">
+                                            <input type="checkbox" class="day-checkbox" value="2" data-day="Tuesday">
+                                            <span class="day-label">Tuesday</span>
+                                        </label>
+                                        <label class="quick-day-slot">
+                                            <input type="checkbox" class="day-checkbox" value="3" data-day="Wednesday">
+                                            <span class="day-label">Wednesday</span>
+                                        </label>
+                                        <label class="quick-day-slot">
+                                            <input type="checkbox" class="day-checkbox" value="4" data-day="Thursday">
+                                            <span class="day-label">Thursday</span>
+                                        </label>
+                                        <label class="quick-day-slot">
+                                            <input type="checkbox" class="day-checkbox" value="5" data-day="Friday">
+                                            <span class="day-label">Friday</span>
+                                        </label>
+                                        <label class="quick-day-slot">
+                                            <input type="checkbox" class="day-checkbox" value="6" data-day="Saturday">
+                                            <span class="day-label">Saturday</span>
+                                        </label>
+                                        <label class="quick-day-slot">
+                                            <input type="checkbox" class="day-checkbox" value="0" data-day="Sunday">
+                                            <span class="day-label">Sunday</span>
+                                        </label>
                                     </div>
                                 </div>
                             </div>
-                            
-                            <div>
-                                <label for="period" class="block text-base font-bold text-black mb-3">⏱️ Period (minutes)</label>
-                                <div class="relative">
-                                    <input type="hidden" id="period" name="period" value="" required>
-                                    <button type="button" id="period-dropdown-trigger" class="w-full px-4 py-3 rounded-lg bg-white border-2 border-gray-300 text-gray-800 font-semibold text-base focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-200 text-left flex justify-between items-center">
-                                        <span id="selected-period-display">Select duration</span>
-                                        <svg class="w-5 h-5 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </div>
+
+                        <!-- My Availability - Compact Rectangle -->
+                        <div class="bg-white rounded-lg shadow-md p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+                                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                         </svg>
-                                    </button>
-                                    <div id="period-dropdown-menu" class="absolute z-50 w-full mt-1 bg-white border-2 border-gray-200 rounded-lg shadow-lg max-h-32 overflow-y-auto hidden">
-                                        <div class="p-2">
-                                            <div class="period-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-period="15" data-display="15 minutes">15 minutes</div>
-                                            <div class="period-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-period="30" data-display="30 minutes">30 minutes</div>
-                                            <div class="period-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-period="45" data-display="45 minutes">45 minutes</div>
-                                            <div class="period-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-period="60" data-display="60 minutes">60 minutes</div>
+                                    </div>
+                                    <h3 class="text-sm font-semibold text-gray-900">My Availability</h3>
+                                </div>
+                                <button type="button" onclick="toggleSlotsView()" class="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center space-x-1">
+                                    <span id="toggle-text">Show Details</span>
+                                    <svg id="toggle-icon" class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            
+                            <!-- Summary Info -->
+                            <div class="text-xs text-gray-600 mb-3">
+                                {% if availability_slots %}
+                                    <span>{{ availability_slots|length }} slots</span>
+                                    {% set unique_dates = availability_slots|map(attribute='start_time.date')|unique|list %}
+                                    <span class="mx-1">•</span>
+                                    <span>{{ unique_dates|length }} dates</span>
+                                {% else %}
+                                    <span>No slots created yet</span>
+                                {% endif %}
+                            </div>
+
+                            <!-- Detailed View (Hidden by default) -->
+                            <div id="detailed-slots-view" class="hidden space-y-2">
+                                {% if availability_slots %}
+                                    {% for slot in availability_slots %}
+                                    <div class="group relative bg-gray-50 rounded border border-gray-200 p-2 hover:shadow-sm transition-all duration-200" data-slot-id="{{ slot.id }}">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center space-x-2 flex-1">
+                                                <input type="checkbox" name="slot_ids" value="{{ slot.id }}" class="slot-checkbox form-checkbox h-3 w-3 text-blue-600" @change="updateSelectedCount()">
+                                                <div class="flex-1">
+                                                    <div class="flex items-center space-x-2">
+                                                        <span class="text-xs font-medium text-gray-900">
+                                                            {{ slot.start_time.strftime('%B %d') }}
+                                                        </span>
+                                                        <span class="text-xs text-gray-500">
+                                                            {{ slot.start_time.strftime('%A') }}
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex items-center space-x-2">
+                                                        <span class="text-xs text-gray-600">
+                                                            {{ slot.start_time.strftime('%I:%M %p') }} - {{ slot.end_time.strftime('%I:%M %p') }}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center space-x-1">
+                                                <span class="px-1 py-0.5 text-xs font-medium rounded-full {% if slot.is_available %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                                    {% if slot.is_available %}Available{% else %}Booked{% endif %}
+                                                </span>
+                                                <button type="button" onclick="deleteIndividualSlot({{ slot.id }}, this, event)" class="text-red-500 hover:text-red-700 p-0.5 rounded hover:bg-red-50 transition-all duration-200" data-deleting="false">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                            
-                            <div class="flex space-x-3">
-                                <button type="button" onclick="handleSubmit()" class="flex-1 text-white p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 font-medium" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);" onmouseover="this.style.background='linear-gradient(135deg, #2a5298 0%, #1e3c72 100%)'" onmouseout="this.style.background='linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)'">
-                                    Add Slot
-                                </button>
-                                <button type="button" onclick="this.form.reset()" class="flex-1 bg-gray-300 text-gray-700 p-3 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 font-medium">
-                                    Reset
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-
-                    <!-- Current Slots Section -->
-                    <div id="availability-app" class="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-                    <!-- Header -->
-                    <div class="flex items-center justify-between mb-6">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                </svg>
-                            </div>
-                            <div>
-                                <h2 class="text-xl font-bold text-gray-900">My Availability</h2>
-                                <p class="text-sm text-gray-500">{{ availability_slots|length if availability_slots else 0 }} time slots</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Bulk Actions Bar -->
-                    {% if availability_slots %}
-                    <div class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
-                                <input type="checkbox" id="select-all-checkbox" class="form-checkbox h-4 w-4 text-blue-600" @click="toggleSelectAll($event.target)">
-                                <label for="select-all-checkbox" class="text-sm font-medium text-gray-700">Select all slots</label>
-                            </div>
-                            <button type="button" @click="deleteSelectedSlots()" class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 transition flex items-center space-x-2" :disabled="selectedCount === 0">
-                                <svg id="bulk-delete-indicator" class="w-4 h-4 animate-spin hidden" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                                </svg>
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                </svg>
-                                <span>Delete selected slots</span>
-                            </button>
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    <!-- Slots List -->
-                    <div id="availability-list" class="space-y-3">
-                        {% if availability_slots %}
-                            {% for slot in availability_slots %}
-                            <div class="group relative bg-white rounded-lg border border-gray-200 p-4 hover:shadow-lg transition-all duration-200 hover:border-blue-300" data-hovered="false" data-editing="false" data-slot-id="{{ slot.id }}">
-                                <!-- Edit Mode -->
-                                <div class="space-y-3" style="display: none;">
-                                    <div class="flex items-center justify-between">
-                                        <h4 class="text-sm font-semibold text-gray-900">Edit Time Slot</h4>
-                                        <button class="text-gray-400 hover:text-gray-600">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="text-center py-4">
+                                        <div class="w-8 h-8 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                             </svg>
-                                        </button>
+                                        </div>
+                                        <p class="text-xs text-gray-600">No availability slots yet</p>
                                     </div>
-                                    <form hx-put="/api/v1/availability/{{ slot.id }}" hx-target="closest div" hx-swap="outerHTML" class="space-y-3">
-                                        <div class="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <label class="block text-xs font-medium text-gray-700 mb-1">Date</label>
-                                                <input type="date" name="date" value="{{ slot.start_time.strftime('%Y-%m-%d') }}" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                            </div>
-                                            <div>
-                                                <label class="block text-xs font-medium text-gray-700 mb-1">Time</label>
-                                                <input type="time" name="start_time" value="{{ slot.start_time.strftime('%H:%M') }}" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                            </div>
-                                        </div>
-                                        <div class="flex items-center space-x-2">
-                                            <button type="submit" class="flex-1 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition">
-                                                Save Changes
-                                            </button>
-                                            <button type="button" class="px-3 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-300 transition">
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
 
-                                <!-- View Mode -->
+                    <!-- Right Side - Add New Slot -->
+                    <div class="space-y-6">
+                        <!-- Add New Slot Card -->
+                        <div class="form-card">
+                            <div class="mb-6">
                                 <div class="flex items-center justify-between">
-                                    <div class="flex items-center space-x-3 flex-1">
-                                        <input type="checkbox" name="slot_ids" value="{{ slot.id }}" class="slot-checkbox form-checkbox h-4 w-4 text-blue-600" @change="updateSelectedCount()">
-                                        <div class="flex-1">
-                                            <div class="flex items-center space-x-2 mb-1">
-                                                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                                    </svg>
-                                                </div>
-                                                <div>
-                                                    <span class="text-sm font-semibold text-gray-900">
-                                                        {{ slot.start_time.strftime('%B %d, %Y') }}
-                                                    </span>
-                                                    <span class="text-xs text-gray-500 ml-2">
-                                                        {{ slot.start_time.strftime('%A') }}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div class="flex items-center space-x-2">
-                                                <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                                                    <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                                    </svg>
-                                                </div>
-                                                <span class="text-sm text-gray-600">
-                                                    {{ slot.start_time.strftime('%I:%M %p') }} - {{ slot.end_time.strftime('%I:%M %p') }}
-                                                </span>
-                                                <span class="text-xs text-gray-400">
-                                                    ({{ ((slot.end_time - slot.start_time).total_seconds() / 60)|int }} min)
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center space-x-2 ml-3">
-                                        <span class="px-2 py-1 text-xs font-medium rounded-full {% if slot.is_available %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
-                                            {% if slot.is_available %}Available{% else %}Booked{% endif %}
-                                        </span>
-                                        <div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button @click="editing = true" class="text-blue-500 hover:text-blue-700 p-1.5 rounded-lg hover:bg-blue-50 transition-all duration-200">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                                </svg>
-                                            </button>
-                                            <button type="button" onclick="deleteIndividualSlot({{ slot.id }}, this, event)" class="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-all duration-200" data-deleting="false">
-                                                <svg id="delete-indicator-{{ slot.id }}" class="w-4 h-4 animate-spin hidden" fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                                                </svg>
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </div>
+                                    <h2 class="text-xl font-semibold text-gray-900">Add New Slot</h2>
                                 </div>
                             </div>
-                            {% endfor %}
-                        {% else %}
-                            <div class="text-center py-12">
-                                <!-- Animated Calendar Icon -->
-                                <div class="w-24 h-24 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-full flex items-center justify-center mx-auto mb-8 shadow-lg">
-                                    <svg class="w-12 h-12 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                    </svg>
+                            
+                            <form hx-post="/dashboard/api/availability/" hx-target="#availability-list" hx-swap="beforeend" class="space-y-6">
+                                <div id="form-error" class="text-red-500 text-sm mb-4 hidden" style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 12px; padding: 12px;">
+                                    <div class="flex items-center">
+                                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                        </svg>
+                                        Please select all fields first
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="date" class="form-label">📅 Date</label>
+                                    <input type="text" id="date" name="date" required class="form-input" placeholder="Select date">
                                 </div>
                                 
-                                <!-- Main Message -->
-                                <div class="max-w-md mx-auto">
-                                    <h3 class="text-2xl font-bold text-gray-900 mb-3">✨ Ready to Start Booking?</h3>
-                                    <p class="text-lg text-gray-600 mb-6 leading-relaxed">
-                                        Create your first availability slot and start accepting bookings from clients. 
-                                        <span class="font-medium text-blue-600">It only takes a minute!</span>
-                                    </p>
-                                    
-                                    <!-- Feature Highlights -->
-                                    <div class="grid grid-cols-1 gap-3 mb-8 text-left">
-                                        <div class="flex items-center text-sm text-gray-600">
-                                            <div class="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                                            <span>Set your preferred time slots</span>
-                                        </div>
-                                        <div class="flex items-center text-sm text-gray-600">
-                                            <div class="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                                            <span>Sync with Google Calendar</span>
-                                        </div>
-                                        <div class="flex items-center text-sm text-gray-600">
-                                            <div class="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                                            <span>Accept bookings automatically</span>
+                                <div class="form-group">
+                                    <label for="start_time" class="form-label">⏰ Start Time</label>
+                                    <div class="relative">
+                                        <input type="hidden" id="start_time" name="start_time" value="" required>
+                                        <button type="button" id="time-dropdown-trigger" class="form-input text-left flex justify-between items-center">
+                                            <span id="selected-time-display">Select time</span>
+                                            <svg class="w-5 h-5 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                            </svg>
+                                        </button>
+                                        <div id="time-dropdown-menu" class="absolute z-50 w-full mt-1 bg-white border-2 border-gray-200 rounded-lg shadow-lg max-h-32 overflow-y-auto hidden">
+                                            <div class="p-2">
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="07:00" data-display="7:00 AM">7:00 AM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="07:30" data-display="7:30 AM">7:30 AM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="08:00" data-display="8:00 AM">8:00 AM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="08:30" data-display="8:30 AM">8:30 AM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="09:00" data-display="9:00 AM">9:00 AM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="09:30" data-display="9:30 AM">9:30 AM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="10:00" data-display="10:00 AM">10:00 AM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="10:30" data-display="10:30 AM">10:30 AM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="11:00" data-display="11:00 AM">11:00 AM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="11:30" data-display="11:30 AM">11:30 AM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="12:00" data-display="12:00 PM">12:00 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="12:30" data-display="12:30 PM">12:30 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="13:00" data-display="1:00 PM">1:00 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="13:30" data-display="1:30 PM">1:30 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="14:00" data-display="2:00 PM">2:00 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="14:30" data-display="2:30 PM">2:30 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="15:00" data-display="3:00 PM">3:00 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="15:30" data-display="3:30 PM">3:30 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="16:00" data-display="4:00 PM">4:00 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="16:30" data-display="4:30 PM">4:30 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="17:00" data-display="5:00 PM">5:00 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="17:30" data-display="5:30 PM">5:30 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="18:00" data-display="6:00 PM">6:00 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="18:30" data-display="6:30 PM">6:30 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="19:00" data-display="7:00 PM">7:00 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="19:30" data-display="7:30 PM">7:30 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="20:00" data-display="8:00 PM">8:00 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="20:30" data-display="8:30 PM">8:30 PM</div>
+                                                <div class="time-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-time="21:00" data-display="9:00 PM">9:00 PM</div>
+                                            </div>
                                         </div>
                                     </div>
-                                    
-
-                            </div>
-                        {% endif %}
+                                </div>
+                                
+                                <div>
+                                    <label for="period" class="block text-base font-bold text-black mb-3">⏱️ Period (minutes)</label>
+                                    <div class="relative">
+                                        <input type="hidden" id="period" name="period" value="" required>
+                                        <button type="button" id="period-dropdown-trigger" class="w-full px-4 py-3 rounded-lg bg-white border-2 border-gray-300 text-gray-800 font-semibold text-base focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-200 text-left flex justify-between items-center">
+                                            <span id="selected-period-display">Select duration</span>
+                                            <svg class="w-5 h-5 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                            </svg>
+                                        </button>
+                                        <div id="period-dropdown-menu" class="absolute z-50 w-full mt-1 bg-white border-2 border-gray-200 rounded-lg shadow-lg max-h-32 overflow-y-auto hidden">
+                                            <div class="p-2">
+                                                <div class="period-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-period="15" data-display="15 minutes">15 minutes</div>
+                                                <div class="period-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-period="30" data-display="30 minutes">30 minutes</div>
+                                                <div class="period-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-period="45" data-display="45 minutes">45 minutes</div>
+                                                <div class="period-option cursor-pointer px-3 py-2 rounded-md hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 text-black text-base" data-period="60" data-display="60 minutes">60 minutes</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex space-x-3">
+                                    <button type="button" onclick="handleSubmit()" class="flex-1 text-white p-3 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 font-medium" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);" onmouseover="this.style.background='linear-gradient(135deg, #2a5298 0%, #1e3c72 100%)'" onmouseout="this.style.background='linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)'">
+                                        Add Slot
+                                    </button>
+                                    <button type="button" onclick="this.form.reset()" class="flex-1 bg-gray-300 text-gray-700 p-3 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 font-medium">
+                                        Reset
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1647,6 +1804,177 @@ createApp({
     }
 }).mount('#availability-app');
 
+// Quick Availability Functions
+function selectAllTimeSlots() {
+    document.querySelectorAll('.time-slot-checkbox').forEach(checkbox => {
+        checkbox.checked = true;
+    });
+}
 
+function selectAllDays() {
+    document.querySelectorAll('.day-checkbox').forEach(checkbox => {
+        checkbox.checked = true;
+    });
+}
+
+function clearAllSelections() {
+    document.querySelectorAll('.time-slot-checkbox, .day-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+}
+
+function applyQuickAvailability() {
+    const selectedTimes = Array.from(document.querySelectorAll('.time-slot-checkbox:checked')).map(cb => ({
+        time: cb.value,
+        display: cb.getAttribute('data-display')
+    }));
+    
+    const selectedDays = Array.from(document.querySelectorAll('.day-checkbox:checked')).map(cb => ({
+        day: parseInt(cb.value),
+        name: cb.getAttribute('data-day')
+    }));
+    
+    if (selectedTimes.length === 0 || selectedDays.length === 0) {
+        showNotification('Please select at least one time slot and one day', 'warning');
+        return;
+    }
+    
+    // Prevent multiple submissions
+    const button = event.target;
+    if (button.disabled) {
+        console.log('Button already disabled, preventing multiple submissions');
+        return;
+    }
+    
+    // Show loading state
+    const originalText = button.innerHTML;
+    button.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Creating...';
+    button.disabled = true;
+    
+    // Disable all quick availability inputs during processing
+    document.querySelectorAll('.time-slot-checkbox, .day-checkbox').forEach(cb => {
+        cb.disabled = true;
+    });
+    
+    // Generate dates for the next 1 week
+    const dates = [];
+    const today = new Date();
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() + i);
+        const dayOfWeek = date.getDay();
+        
+        // Check if this day is selected
+        if (selectedDays.some(selected => selected.day === dayOfWeek)) {
+            dates.push(date.toISOString().split('T')[0]);
+        }
+    }
+    
+    // Create availability slots
+    const slots = [];
+    dates.forEach(date => {
+        selectedTimes.forEach(timeSlot => {
+            slots.push({
+                date: date,
+                start_time: timeSlot.time,
+                period: 30 // Default 30 minutes
+            });
+        });
+    });
+    
+    console.log(`Creating ${slots.length} availability slots...`);
+    
+    // Send request to create slots
+    fetch('/dashboard/api/availability/quick', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            slots: slots
+        })
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        return response.json();
+    })
+    .then(data => {
+        console.log('Response data:', data);
+        if (data.success) {
+            showNotification(`Successfully created ${data.slots_created} availability slots!`, 'success');
+            // Reload page to show new slots
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            showNotification(data.message || 'Failed to create availability slots', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error creating availability slots:', error);
+        showNotification('Failed to create availability slots. Please try again.', 'error');
+    })
+    .finally(() => {
+        // Restore button state
+        button.innerHTML = originalText;
+        button.disabled = false;
+        
+        // Re-enable all quick availability inputs
+        document.querySelectorAll('.time-slot-checkbox, .day-checkbox').forEach(cb => {
+            cb.disabled = false;
+        });
+    });
+}
+
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 flex items-center space-x-2 ${
+        type === 'success' ? 'bg-green-600 text-white' :
+        type === 'error' ? 'bg-red-600 text-white' :
+        type === 'warning' ? 'bg-yellow-600 text-white' :
+        'bg-blue-600 text-white'
+    }`;
+    
+    const icon = type === 'success' ? 
+        '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>' :
+        type === 'error' ?
+        '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>' :
+        type === 'warning' ?
+        '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>' :
+        '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+    
+    notification.innerHTML = `
+        ${icon}
+        <span class="font-medium">${message}</span>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Remove notification after 5 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+// Toggle slots view
+function toggleSlotsView() {
+    const detailedSlotsView = document.getElementById('detailed-slots-view');
+    const toggleText = document.getElementById('toggle-text');
+    const toggleIcon = document.getElementById('toggle-icon');
+    
+    if (detailedSlotsView.classList.contains('hidden')) {
+        detailedSlotsView.classList.remove('hidden');
+        toggleText.textContent = 'Hide Details';
+        toggleIcon.classList.remove('rotate-180');
+        toggleIcon.classList.add('rotate-0');
+    } else {
+        detailedSlotsView.classList.add('hidden');
+        toggleText.textContent = 'Show Details';
+        toggleIcon.classList.remove('rotate-0');
+        toggleIcon.classList.add('rotate-180');
+    }
+}
 </script>
 {% endblock %}

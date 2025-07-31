@@ -614,6 +614,13 @@
         </div>
     </div>
     
+    <!-- Branding Footer -->
+    <div style="position: absolute; bottom: 15px; left: 15px; z-index: 1000;">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); padding: 8px 16px; border-radius: 20px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); border: 1px solid rgba(0, 0, 0, 0.05);">
+            <span style="font-size: 12px; color: #666; font-weight: 500;">Powered by</span>
+            <span style="font-size: 14px; color: #1e3c72; font-weight: 700; letter-spacing: -0.5px;">Vaatify</span>
+        </div>
+    </div>
 
 </div>
 
@@ -706,58 +713,7 @@ createApp({
             }
             this.calendarDays = days;
         },
-        async loadCalendarEvents() {
-            try {
-                const response = await fetch(`/api/v1/calendar/events/{{ user.scheduling_slug }}`);
-                const data = await response.json();
-                
-                const eventsContainer = document.getElementById('events-container');
-                
-                if (data.error) {
-                    eventsContainer.innerHTML = `
-                        <div style="text-align: center; padding: 20px; opacity: 0.7;">
-                            <p style="font-size: 14px; color: rgba(255,255,255,0.8);">No calendar events available</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                if (data.events && data.events.length > 0) {
-                    const eventsHtml = data.events.slice(0, 5).map(event => {
-                        const eventDate = new Date(event.date);
-                        const formattedDate = eventDate.toLocaleDateString('en-US', { 
-                            month: 'short', 
-                            day: 'numeric',
-                            weekday: 'short'
-                        });
-                        
-                        return `
-                            <div style="background: rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; margin-bottom: 8px; border-left: 3px solid rgba(255,255,255,0.3);">
-                                <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px; opacity: 0.9;">${event.title}</div>
-                                <div style="font-size: 12px; opacity: 0.7;">${formattedDate} • ${event.start_time} - ${event.end_time}</div>
-                                ${event.location ? `<div style="font-size: 11px; opacity: 0.6; margin-top: 2px;">📍 ${event.location}</div>` : ''}
-                            </div>
-                        `;
-                    }).join('');
-                    
-                    eventsContainer.innerHTML = eventsHtml;
-                } else {
-                    eventsContainer.innerHTML = `
-                        <div style="text-align: center; padding: 20px; opacity: 0.7;">
-                            <p style="font-size: 14px; color: rgba(255,255,255,0.8);">No upcoming events</p>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                console.error('Error loading calendar events:', error);
-                const eventsContainer = document.getElementById('events-container');
-                eventsContainer.innerHTML = `
-                    <div style="text-align: center; padding: 20px; opacity: 0.7;">
-                        <p style="font-size: 14px; color: rgba(255,255,255,0.8);">Unable to load events</p>
-                    </div>
-                `;
-            }
-        },
+
         async selectDate(day) {
             if (!day.isAvailable) return;
             this.selectedDate = new Date(day.date + 'T00:00:00');
@@ -765,13 +721,11 @@ createApp({
             day.isSelected = true;
             this.loadingSlots = true;
             this.step = 2;
-            await new Promise(resolve => setTimeout(resolve, 2000));
             await this.fetchAvailableSlots();
         },
         async selectTime(time) {
             this.selectedTime = time;
             this.loadingSlots = true;
-            await new Promise(resolve => setTimeout(resolve, 2000));
             this.step = 3;
             this.loadingSlots = false;
         },
