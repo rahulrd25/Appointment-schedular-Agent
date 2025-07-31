@@ -28,7 +28,7 @@
                             <h3 class="text-xl font-semibold text-gray-900">Cancellation Failed</h3>
                         {% endif %}
                     </div>
-                    <button hx-get="/bookings" hx-target="#booking-modal" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <button onclick="document.getElementById('booking-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 transition-colors">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -72,8 +72,7 @@
                 <!-- Action Buttons -->
                 <div class="flex justify-end">
                     <button 
-                        hx-get="/bookings" 
-                        hx-target="#booking-modal"
+                        onclick="document.getElementById('booking-modal').classList.add('hidden')"
                         class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                         Close

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Bookings - Appointment Agent{% endblock %}
+{% block title %}Bookings - SmartCal{% endblock %}
 
 {% block content %}
 <style>
@@ -177,12 +177,12 @@
     .page-title {
         font-size: 28px;
         font-weight: 700;
-        color: white;
+        color: black;
         margin-bottom: 8px;
     }
 
     .page-subtitle {
-        color: white;
+        color: black;
         font-size: 16px;
     }
 
@@ -312,8 +312,8 @@
                 
                 <div class="flex items-center space-x-4">
                     <div class="flex items-center space-x-2">
-                        <span class="text-sm text-white">Welcome,</span>
-                        <span class="font-medium text-white">{{ current_user.full_name or current_user.email }}</span>
+                        <span class="text-sm font-semibold text-black">Welcome,</span>
+                        <span class="font-bold text-black">{{ current_user.full_name or current_user.email }}</span>
                     </div>
                     <a href="/logout" class="text-gray-600 hover:text-gray-900">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

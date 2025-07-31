@@ -77,7 +77,7 @@ class GmailService:
                 {f'<div style="background-color: #eff6ff; padding: 15px; border-radius: 8px; margin: 20px 0;"><p><strong>Reason for Rescheduling:</strong></p><p style="font-style: italic;">"{reason}"</p></div>' if reason else ''}
                 
                 <p>If you have any questions, please contact {host_name} directly.</p>
-                <p>Best regards,<br>The Appointment Agent Team</p>
+                <p>Best regards,<br>The SmartCal Team</p>
             </div>
         </body>
         </html>
@@ -110,10 +110,81 @@ class GmailService:
                 </div>
                 
                 <p>If you have any questions, please contact {host_name} directly.</p>
-                <p>Best regards,<br>The Appointment Agent Team</p>
+                <p>Best regards,<br>The SmartCal Team</p>
             </div>
         </body>
         </html>
         """
         
-        return self.send_email(to_email, subject, html_body, host_name) 
+        return self.send_email(to_email, subject, html_body, host_name)
+    
+    def send_booking_confirmation(self, to_email: str, to_name: str, host_name: str, booking):
+        """Send booking confirmation email to guest."""
+        subject = f"Booking Confirmed with {host_name}"
+        
+        html_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: #10b981; color: white; padding: 20px; text-align: center;">
+                <h1>Booking Confirmed! ✅</h1>
+            </div>
+            
+            <div style="padding: 20px;">
+                <p>Hi {to_name},</p>
+                
+                <p>Your booking with <strong>{host_name}</strong> has been confirmed!</p>
+                
+                <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <h3 style="margin-top: 0;">📅 Booking Details</h3>
+                    <p><strong>Date & Time:</strong> {booking.start_time.strftime('%B %d, %Y at %I:%M %p')}</p>
+                    <p><strong>Duration:</strong> {int((booking.end_time - booking.start_time).total_seconds() / 60)} minutes</p>
+                    <p><strong>Booking ID:</strong> #{booking.id}</p>
+                    <p><strong>Host:</strong> {host_name}</p>
+                </div>
+                
+                {f'<div style="background-color: #eff6ff; padding: 15px; border-radius: 8px; margin: 20px 0;"><p><strong>Your Message:</strong></p><p style="font-style: italic;">"{booking.guest_message}"</p></div>' if booking.guest_message else ''}
+                
+                <p>Please arrive on time for your appointment. If you need to reschedule or cancel, please contact {host_name} directly.</p>
+                <p>Best regards,<br>The SmartCal Team</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        return self.send_email(to_email, subject, html_body, host_name)
+    
+    def send_booking_notification(self, to_email: str, to_name: str, guest_name: str, guest_email: str, booking):
+        """Send booking notification email to host."""
+        subject = f"New Booking Confirmed - {guest_name}"
+        
+        html_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: #10b981; color: white; padding: 20px; text-align: center;">
+                <h1>New Booking Confirmed! 📅</h1>
+            </div>
+            
+            <div style="padding: 20px;">
+                <p>Hi {to_name},</p>
+                
+                <p>You have a new confirmed booking!</p>
+                
+                <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <h3 style="margin-top: 0;">📅 Booking Details</h3>
+                    <p><strong>Date & Time:</strong> {booking.start_time.strftime('%B %d, %Y at %I:%M %p')}</p>
+                    <p><strong>Duration:</strong> {int((booking.end_time - booking.start_time).total_seconds() / 60)} minutes</p>
+                    <p><strong>Booking ID:</strong> #{booking.id}</p>
+                    <p><strong>Guest:</strong> {guest_name}</p>
+                    <p><strong>Email:</strong> {guest_email}</p>
+                </div>
+                
+                {f'<div style="background-color: #eff6ff; padding: 15px; border-radius: 8px; margin: 20px 0;"><p><strong>Guest Message:</strong></p><p style="font-style: italic;">"{booking.guest_message}"</p></div>' if booking.guest_message else ''}
+                
+                <p>Please prepare for your meeting. You can manage this booking from your SmartCal dashboard.</p>
+                <p>Best regards,<br>The SmartCal Team</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        return self.send_email(to_email, subject, html_body, to_name)

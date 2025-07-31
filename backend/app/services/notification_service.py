@@ -111,6 +111,58 @@ class NotificationService:
         
         return results
     
+    def send_booking_confirmation_notifications(
+        self,
+        guest_email: str,
+        guest_name: str,
+        host_email: str,
+        host_name: str,
+        booking,
+        host_access_token: str = None,
+        host_refresh_token: str = None
+    ) -> dict:
+        """Send booking confirmation notifications using host's Gmail."""
+        
+        results = {
+            "guest_email_sent": False,
+            "host_email_sent": False,
+            "gmail_used": False,
+            "errors": [],
+            "success": False
+        }
+        
+        # Use Gmail API if host has Google tokens
+        if host_access_token and host_refresh_token:
+            try:
+                gmail_service = GmailService(host_access_token, host_refresh_token)
+                
+                # Send confirmation to guest
+                guest_sent = gmail_service.send_booking_confirmation(
+                    guest_email, guest_name, host_name, booking
+                )
+                results["guest_email_sent"] = guest_sent
+                
+                # Send notification to host
+                host_sent = gmail_service.send_booking_notification(
+                    host_email, host_name, guest_name, guest_email, booking
+                )
+                results["host_email_sent"] = host_sent
+                
+                results["gmail_used"] = True
+                print("Gmail API used for booking confirmation notifications")
+                
+            except Exception as e:
+                results["errors"].append(f"Gmail API failed: {str(e)}")
+                print(f"Gmail API failed: {e}")
+        else:
+            results["errors"].append("No Google OAuth tokens available")
+            print("No Google OAuth tokens available for booking confirmation email")
+        
+        # Determine overall success
+        results["success"] = results["guest_email_sent"] or results["host_email_sent"]
+        
+        return results
+    
     def get_notification_summary(self, results: dict) -> dict:
         """Generate detailed notification results."""
         

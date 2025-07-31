@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Environment Setup Helper for Appointment Agent
-This script helps you set up the required environment variables for the AI agent.
+Environment Setup Helper for SmartCal
 """
 
 import os
@@ -68,7 +67,7 @@ def setup_openai_key():
 
 def main():
     """Main setup function"""
-    print("🚀 Appointment Agent Environment Setup")
+    print("🚀 SmartCal Environment Setup")
     print("=" * 50)
     
     # Check current environment

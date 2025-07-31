@@ -17,7 +17,7 @@ def get_user_by_email(db: Session, email: str):
     return db.query(User).filter(User.email == email).first()
 
 
-async def get_user_by_scheduling_slug(db: Session, scheduling_slug: str):
+def get_user_by_scheduling_slug(db: Session, scheduling_slug: str):
     return (
         db.query(User)
         .filter(User.scheduling_slug == scheduling_slug)

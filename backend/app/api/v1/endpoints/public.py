@@ -24,7 +24,7 @@ async def get_public_booking_page(
     db: Session = Depends(get_db),
 ) -> Any:
     """Render the public booking page for a given scheduling slug."""
-    user = await get_user_by_scheduling_slug(db, scheduling_slug)
+    user = get_user_by_scheduling_slug(db, scheduling_slug)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -43,7 +43,7 @@ async def get_user_availability(
     db: Session = Depends(get_db),
 ) -> JSONResponse:
     """Get available time slots for a specific date."""
-    user = await get_user_by_scheduling_slug(db, scheduling_slug)
+    user = get_user_by_scheduling_slug(db, scheduling_slug)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -95,7 +95,7 @@ async def create_public_booking(
     db: Session = Depends(get_db),
 ) -> JSONResponse:
     """Create a booking for the public interface."""
-    user = await get_user_by_scheduling_slug(db, scheduling_slug)
+    user = get_user_by_scheduling_slug(db, scheduling_slug)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     

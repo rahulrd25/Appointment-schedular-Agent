@@ -2,7 +2,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func, or_
 
 from app.models.models import AvailabilitySlot, User, Booking
 from app.schemas.schemas import AvailabilitySlotCreate, AvailabilitySlotUpdate
@@ -22,7 +22,59 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
                 "google_event_id": None
             }
         
+        # Check for overlapping slots on the same date with proper error handling
+        try:
+            # Normalize timezone for comparison
+            normalized_start = slot.start_time.replace(tzinfo=None) if slot.start_time.tzinfo else slot.start_time
+            normalized_end = slot.end_time.replace(tzinfo=None) if slot.end_time.tzinfo else slot.end_time
+            
+            # Get the date part for comparison
+            slot_date = normalized_start.date()
+            
+            # Check for any overlapping slots on the same date
+            # Overlap occurs when:
+            # 1. New slot starts before existing slot ends AND new slot ends after existing slot starts
+            # 2. Or when slots have the same start time
+            existing_overlapping_slot = db.query(AvailabilitySlot).filter(
+                and_(
+                    AvailabilitySlot.user_id == user_id,
+                    func.date(AvailabilitySlot.start_time) == slot_date,
+                    or_(
+                        # Case 1: New slot overlaps with existing slot
+                        and_(
+                            normalized_start < AvailabilitySlot.end_time,
+                            normalized_end > AvailabilitySlot.start_time
+                        ),
+                        # Case 2: Same start time
+                        AvailabilitySlot.start_time == normalized_start
+                    )
+                )
+            ).first()
+            
+            if existing_overlapping_slot:
+                existing_time = existing_overlapping_slot.start_time.strftime("%I:%M %p")
+                existing_date = existing_overlapping_slot.start_time.strftime("%B %d, %Y")
+                existing_end_time = existing_overlapping_slot.end_time.strftime("%I:%M %p")
+                return {
+                    "success": False,
+                    "message": f"You already have a slot from {existing_time} to {existing_end_time} on {existing_date}. Please choose a different time.",
+                    "slot": existing_overlapping_slot,
+                    "calendar_created": False,
+                    "calendar_error": None,
+                    "google_event_id": None
+                }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Error checking for duplicate slots: {str(e)}",
+                "slot": None,
+                "calendar_created": False,
+                "calendar_error": str(e),
+                "google_event_id": None
+            }
+        
         # Check if user has Google Calendar connected
+        calendar_service = None
         if user.google_calendar_connected and user.google_access_token and user.google_refresh_token:
             try:
                 # Test calendar connection first
@@ -36,10 +88,8 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
                 
                 # Test calendar connection first
                 calendar_service.get_events()
-                print(f"✅ Calendar connection test successful for {user.email}")
                 
             except Exception as e:
-                print(f"Calendar connection test failed: {e}")
                 return {
                     "success": False,
                     "message": "Couldn't add slot. Please reconnect your calendar in Settings.",
@@ -49,23 +99,34 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
                     "google_event_id": None
                 }
         
-        # Only create slot in database if calendar conditions are met
-        db_slot = AvailabilitySlot(
-            user_id=user_id,
-            start_time=slot.start_time,
-            end_time=slot.end_time,
-            is_available=slot.is_available
-        )
-        db.add(db_slot)
-        db.commit()
-        db.refresh(db_slot)
+        # Create slot in database with error handling
+        try:
+            db_slot = AvailabilitySlot(
+                user_id=user_id,
+                start_time=slot.start_time,
+                end_time=slot.end_time,
+                is_available=slot.is_available
+            )
+            db.add(db_slot)
+            db.commit()
+            db.refresh(db_slot)
+        except Exception as e:
+            db.rollback()
+            return {
+                "success": False,
+                "message": f"Failed to create slot in database: {str(e)}",
+                "slot": None,
+                "calendar_created": False,
+                "calendar_error": str(e),
+                "google_event_id": None
+            }
         
         calendar_created = None
         calendar_error = None
         google_event_id = None
         
         # Create Google Calendar event if user has connected calendar
-        if user.google_calendar_connected and user.google_access_token and user.google_refresh_token:
+        if calendar_service:
             try:
                 # Create event in Google Calendar
                 event_data = {
@@ -89,14 +150,28 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
                 created_event = calendar_service.create_event(event_data)
                 google_event_id = created_event.get('id')
                 
-                # Update the slot with Google Calendar event ID
-                db_slot.google_event_id = google_event_id
-                db.commit()
+                # Verify that the event was actually created
+                if not google_event_id:
+                    raise Exception("Failed to create Google Calendar event - no event ID returned")
                 
-                calendar_created = True
+                # Update the slot with Google Calendar event ID
+                try:
+                    db_slot.google_event_id = google_event_id
+                    db.commit()
+                    calendar_created = True
+                    print(f"✅ Google Calendar event created successfully: {google_event_id}")
+                except Exception as e:
+                    db.rollback()
+                    return {
+                        "success": False,
+                        "message": f"Slot created but failed to update with calendar event ID: {str(e)}",
+                        "slot": None,
+                        "calendar_created": False,
+                        "calendar_error": str(e),
+                        "google_event_id": None
+                    }
                 
             except Exception as e:
-                print(f"Failed to create Google Calendar event: {e}")
                 # If calendar creation fails, rollback the database slot creation
                 db.rollback()
                 return {
@@ -107,6 +182,14 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
                     "calendar_error": str(e),
                     "google_event_id": None
                 }
+        
+        # Log success if both database and calendar were created
+        if calendar_created and google_event_id:
+            print(f"✅ Slot successfully created in DB and calendar for user {user_id}")
+        elif not calendar_created and google_event_id is None:
+            print(f"⚠️ Slot created in DB only (no calendar connection) for user {user_id}")
+        elif not calendar_created and google_event_id is None:
+            print(f"❌ Slot creation failed for user {user_id}")
         
         return {
             "success": True,
@@ -171,6 +254,38 @@ def get_available_slots_for_booking(db: Session, user_id: int, from_date: dateti
     return sorted(available_slots, key=lambda x: x.start_time)
 
 
+def get_available_slots_for_date(db: Session, user_id: int, date: datetime.date) -> List[AvailabilitySlot]:
+    """Get available slots for a specific date."""
+    # Convert date to datetime for comparison
+    start_of_day = datetime.combine(date, datetime.min.time())
+    end_of_day = datetime.combine(date, datetime.max.time())
+    
+    # Get availability slots for the specific date
+    query = db.query(AvailabilitySlot).filter(
+        and_(
+            AvailabilitySlot.user_id == user_id,
+            AvailabilitySlot.is_available == True,
+            AvailabilitySlot.start_time >= start_of_day,
+            AvailabilitySlot.start_time <= end_of_day
+        )
+    )
+    
+    # Filter out slots that already have confirmed bookings
+    available_slots = []
+    for slot in query.all():
+        existing_booking = db.query(Booking).filter(
+            and_(
+                Booking.availability_slot_id == slot.id,
+                Booking.status == "confirmed"
+            )
+        ).first()
+        
+        if not existing_booking:
+            available_slots.append(slot)
+    
+    return sorted(available_slots, key=lambda x: x.start_time)
+
+
 def get_availability_slot(db: Session, slot_id: int, user_id: int = None) -> Optional[AvailabilitySlot]:
     """Get a specific availability slot."""
     query = db.query(AvailabilitySlot).filter(AvailabilitySlot.id == slot_id)
@@ -213,10 +328,24 @@ def delete_availability_slot(db: Session, slot_id: int, user_id: int) -> dict:
     if existing_booking:
         return {"success": False, "message": "Cannot delete slot with confirmed bookings"}
     
+    # Delete from database first
+    try:
+        db.delete(slot)
+        db.commit()
+        db_deleted = True
+    except Exception as e:
+        db.rollback()
+        return {
+            "success": False,
+            "message": f"Failed to delete slot from database: {str(e)}",
+            "calendar_deleted": None,
+            "calendar_error": None
+        }
+    
+    # Try to delete from Google Calendar if database deletion succeeded
     calendar_deleted = None
     calendar_error = None
     
-    # If slot is linked to a Google Calendar event, delete it from Google Calendar
     if slot.google_event_id:
         user = db.query(User).filter(User.id == slot.user_id).first()
         if user and user.google_access_token and user.google_refresh_token:
@@ -231,23 +360,23 @@ def delete_availability_slot(db: Session, slot_id: int, user_id: int) -> dict:
                 calendar_service.delete_event(slot.google_event_id)
                 calendar_deleted = True
             except Exception as e:
-                print(f"Failed to delete Google Calendar event: {e}")
                 calendar_deleted = False
                 calendar_error = str(e)
         else:
             calendar_deleted = False
             calendar_error = "Google Calendar not connected"
-    else:
-        # No Google Calendar event associated
-        calendar_deleted = None
     
-    # Delete from database
-    db.delete(slot)
-    db.commit()
+    # Return result with appropriate message
+    if calendar_deleted is True:
+        message = "Slot deleted successfully from app and calendar!"
+    elif calendar_deleted is False:
+        message = f"Slot deleted from app but failed to delete from calendar: {calendar_error}"
+    else:
+        message = "Slot deleted successfully from app."
     
     return {
         "success": True,
-        "message": "Availability slot deleted successfully",
+        "message": message,
         "calendar_deleted": calendar_deleted,
         "calendar_error": calendar_error
     }
