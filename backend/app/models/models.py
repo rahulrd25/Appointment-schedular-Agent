@@ -83,6 +83,12 @@ class Booking(Base):
     # Google Calendar integration
     google_event_id = Column(String, nullable=True)  # Store Google Calendar event ID
     
+    # Sync status tracking
+    sync_status = Column(String, default="pending")  # pending, synced, failed, conflict
+    last_synced = Column(DateTime(timezone=True), nullable=True)  # Last successful sync timestamp
+    sync_error = Column(String, nullable=True)  # Error message if sync failed
+    sync_attempts = Column(Integer, default=0)  # Number of sync attempts
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

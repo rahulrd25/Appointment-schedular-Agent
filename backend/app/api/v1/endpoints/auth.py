@@ -14,6 +14,8 @@ from app.core.database import get_db
 from app.core.security import create_access_token, verify_token
 from app.schemas.schemas import UserCreate
 from app.services.user_service import authenticate_user, create_user, get_user_by_email
+from app.core.timezone_utils import TimezoneManager
+from app.services.google_calendar_service import GoogleCalendarService
 
 router = APIRouter()
 
@@ -166,6 +168,24 @@ async def google_auth_callback(
                 user.google_refresh_token = refresh_token
             user.google_calendar_connected = True
             user.google_calendar_email = user.email
+            
+            # Auto-detect timezone from Google Calendar
+            try:
+                calendar_service = GoogleCalendarService(
+                    access_token=access_token,
+                    refresh_token=refresh_token,
+                    db=db,
+                    user_id=user.id
+                )
+                detected_timezone = TimezoneManager.detect_timezone_from_google_calendar(calendar_service)
+                user.timezone = detected_timezone
+                print(f"✅ Auto-detected timezone: {detected_timezone} for user {user.email}")
+            except Exception as e:
+                print(f"⚠️ Could not detect timezone for user {user.email}: {e}")
+                # Keep existing timezone or default to UTC
+                if not user.timezone:
+                    user.timezone = "UTC"
+            
             db.commit()
             
             # Create access token for our app
@@ -177,9 +197,10 @@ async def google_auth_callback(
                 key="access_token",
                 value=jwt_token,
                 httponly=True,
-                max_age=1800,
+                max_age=86400,  # 24 hours (1440 minutes * 60 seconds)
                 secure=False,
-                samesite="lax"
+                samesite="lax",
+                path="/"  # Make cookie available across all paths
             )
             return response
         
@@ -223,8 +244,24 @@ async def complete_calendar_connection(
         user.google_calendar_connected = True
         user.google_calendar_email = connection_data['calendar_email']
         
+        # Auto-detect timezone from Google Calendar
+        try:
+            calendar_service = GoogleCalendarService(
+                access_token=connection_data['access_token'],
+                refresh_token=connection_data['refresh_token'],
+                db=db,
+                user_id=user.id
+            )
+            detected_timezone = TimezoneManager.detect_timezone_from_google_calendar(calendar_service)
+            user.timezone = detected_timezone
+            print(f"✅ Auto-detected timezone: {detected_timezone} for user {user.email}")
+        except Exception as e:
+            print(f"⚠️ Could not detect timezone for user {user.email}: {e}")
+            # Keep existing timezone or default to UTC
+            if not user.timezone:
+                user.timezone = "UTC"
+        
         db.commit()
-        print(f"Calendar connected for user {user.email}")
         
         # Clean up the temporary connection data
         del router.state.pending_calendar_connections[connection_id]

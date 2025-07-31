@@ -250,19 +250,28 @@ async def get_calendar_events(
     current_user: User = Depends(get_current_user_from_cookie)
 ):
     """
-    Get calendar events for the agent dashboard
+    Get calendar events for the agent dashboard from database
     """
     try:
-        if not current_user.google_access_token:
-            return {"events": []}
+        # Get all bookings from database (includes both local and calendar-synced)
+        from app.services.booking_service import get_bookings_for_user
+        all_bookings = get_bookings_for_user(db, current_user.id)
         
-        service = GoogleCalendarService(
-            current_user.google_access_token, 
-            current_user.google_refresh_token,
-            db=db,
-            user_id=current_user.id
-        )
-        events = service.get_events()
+        # Filter for calendar-synced bookings (those with google_event_id)
+        calendar_bookings = [booking for booking in all_bookings if booking.google_event_id]
+        
+        # Convert to event format
+        events = []
+        for booking in calendar_bookings:
+            events.append({
+                "id": booking.google_event_id,
+                "summary": booking.guest_name,
+                "start": {"dateTime": booking.start_time.isoformat()},
+                "end": {"dateTime": booking.end_time.isoformat()},
+                "description": booking.guest_message,
+                "organizer": {"email": booking.guest_email}
+            })
+        
         return {"events": events}
     except Exception as e:
         # Return empty events if there's an error

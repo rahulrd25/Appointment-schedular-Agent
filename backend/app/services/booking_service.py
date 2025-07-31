@@ -8,6 +8,7 @@ from app.models.models import Booking, AvailabilitySlot, User
 from app.schemas.schemas import BookingCreate, BookingUpdate, PublicBookingCreate
 from app.services.availability_service import get_availability_slot, check_slot_availability
 from app.services.google_calendar_service import GoogleCalendarService
+from app.core.timezone_utils import TimezoneManager, ensure_utc_datetime, format_datetime_for_user
 
 
 
@@ -17,86 +18,80 @@ def create_booking(
     slot_id: int, 
     host_user: User
 ) -> Optional[Booking]:
-    """Create a new booking for a specific availability slot."""
-    
-    # Check if slot is available
-    if not check_slot_availability(db, slot_id):
-        return None
-    
-    slot = get_availability_slot(db, slot_id)
-    if not slot:
-        return None
-    
-    # Create the booking
-    db_booking = Booking(
-        host_user_id=host_user.id,
-        availability_slot_id=slot_id,
-        guest_name=booking_data.guest_name,
-        guest_email=booking_data.guest_email,
-        guest_message=booking_data.guest_message,
-        start_time=slot.start_time,
-        end_time=slot.end_time,
-        status="confirmed"
-    )
-    
-    # Try to create Google Calendar event if host has credentials
-    google_event_id = None
-    if host_user.google_access_token and host_user.google_refresh_token:
-        try:
-            calendar_service = GoogleCalendarService(
-                access_token=host_user.google_access_token,
-                refresh_token=host_user.google_refresh_token,
-                db=db,
-                user_id=host_user.id
-            )
-            
-            event_title = f"Meeting with {booking_data.guest_name}"
-            event_description = f"Meeting scheduled via booking system.\n\nGuest: {booking_data.guest_name}\nEmail: {booking_data.guest_email}"
-            if booking_data.guest_message:
-                event_description += f"\nMessage: {booking_data.guest_message}"
-            
-            created_event = calendar_service.create_booking_event(
-                title=event_title,
-                start_time=slot.start_time,
-                end_time=slot.end_time,
-                guest_email=booking_data.guest_email,
-                host_email=host_user.email,
-                description=event_description
-            )
-            
-            google_event_id = created_event.get('id')
-            
-            # Verify that the event was actually created
-            if not google_event_id:
-                raise Exception("Failed to create Google Calendar event - no event ID returned")
-            
-            print(f"✅ Google Calendar booking event created successfully: {google_event_id}")
-            
-        except Exception as e:
-            print(f"Failed to create Google Calendar event: {e}")
-            # Continue with booking even if calendar event creation fails
-    
-    db_booking.google_event_id = google_event_id
-    
-    # Mark the availability slot as unavailable (booked)
-    slot.is_available = False
-    
-    db.add(db_booking)
-    db.commit()
-    db.refresh(db_booking)
-    
-    # Log success if both database and calendar were created
-    if google_event_id:
-        print(f"✅ Booking successfully created in DB and calendar for user {host_user.id}")
-    else:
-        print(f"⚠️ Booking created in DB only (no calendar connection) for user {host_user.id}")
-    
-    # Send confirmation emails with proper success/failure tracking
-    emails_sent = False
-    if host_user.google_access_token and host_user.google_refresh_token:
+    """Create a new booking."""
+    try:
+        # Get the availability slot
+        slot = db.query(AvailabilitySlot).filter(AvailabilitySlot.id == slot_id).first()
+        if not slot:
+            return None
+        
+        # Create the booking
+        booking = Booking(
+            host_user_id=host_user.id,
+            availability_slot_id=slot_id,
+            guest_name=booking_data.guest_name,
+            guest_email=booking_data.guest_email,
+            guest_message=booking_data.guest_message,
+            start_time=slot.start_time,
+            end_time=slot.end_time,
+            status="confirmed",
+            sync_status="pending",
+            sync_attempts=0
+        )
+        
+        db.add(booking)
+        db.flush()  # Get the ID without committing
+        
+        # Try to create Google Calendar event
+        google_event_id = None
+        calendar_created = False
+        calendar_error = None
+        
+        if host_user.google_calendar_connected and host_user.google_access_token:
+            try:
+                from app.services.google_calendar_service import GoogleCalendarService
+                calendar_service = GoogleCalendarService(
+                    access_token=host_user.google_access_token,
+                    refresh_token=host_user.google_refresh_token,
+                    db=db,
+                    user_id=host_user.id
+                )
+                
+                # Create calendar event
+                calendar_event = calendar_service.create_booking_event(
+                    title=f"Meeting with {booking_data.guest_name}",
+                    start_time=slot.start_time,
+                    end_time=slot.end_time,
+                    guest_email=booking_data.guest_email,
+                    host_email=host_user.email,
+                    description=booking_data.guest_message
+                )
+                
+                if calendar_event and calendar_event.get('id'):
+                    google_event_id = calendar_event['id']
+                    booking.google_event_id = google_event_id
+                    booking.sync_status = "synced"
+                    booking.last_synced = datetime.utcnow()
+                    calendar_created = True
+                    print(f"✅ Event created in calendar and DB for booking {booking.id}")
+                else:
+                    booking.sync_status = "failed"
+                    booking.sync_error = "Calendar event creation failed"
+                    calendar_error = "Failed to create calendar event"
+                    
+            except Exception as e:
+                booking.sync_status = "failed"
+                booking.sync_error = str(e)
+                calendar_error = str(e)
+                print(f"❌ Calendar event creation failed for booking {booking.id}: {e}")
+        
+        # Commit the booking
+        db.commit()
+        
+        # Send confirmation email
+        email_sent = False
         try:
             from app.services.notification_service import NotificationService
-            
             notification_service = NotificationService()
             
             notification_results = notification_service.send_booking_confirmation_notifications(
@@ -104,20 +99,30 @@ def create_booking(
                 guest_name=booking_data.guest_name,
                 host_email=host_user.email,
                 host_name=host_user.full_name,
-                booking=db_booking,
+                booking=booking,
                 host_access_token=host_user.google_access_token,
                 host_refresh_token=host_user.google_refresh_token
             )
             
-            emails_sent = notification_results["success"]
+            email_sent = notification_results["success"]
         except Exception as e:
-            print(f"Failed to send booking confirmation notifications: {e}")
-            emails_sent = False
-    
-    # Return booking with email status (for consistency with other functions)
-    # Note: We don't return a dict like other functions since this is the main create_booking function
-    # that returns the booking object directly
-    return db_booking
+            print(f"❌ Email sending failed for booking {booking.id}: {e}")
+        
+        if calendar_created and email_sent:
+            print(f"✅ Booking {booking.id} completed: Event in calendar, DB, and email sent")
+        elif calendar_created:
+            print(f"✅ Booking {booking.id} completed: Event in calendar and DB, but email failed")
+        elif email_sent:
+            print(f"✅ Booking {booking.id} completed: Event in DB and email sent, but calendar failed")
+        else:
+            print(f"⚠️ Booking {booking.id} created in DB only: Calendar and email failed")
+        
+        return booking
+        
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Booking creation failed: {e}")
+        return None
 
 
 def get_bookings_for_user(db: Session, user_id: int, status: str = None) -> List[Booking]:
@@ -195,28 +200,53 @@ def update_booking(
 
 
 def cancel_booking(db: Session, booking_id: int, user_id: int = None) -> bool:
-    """Cancel a booking."""
-    booking = get_booking(db, booking_id, user_id)
-    if not booking:
-        return False
-    
-    booking.status = "cancelled"
-    
-    # Try to delete the Google Calendar event
-    if booking.google_event_id:
-        try:
-            host = db.query(User).filter(User.id == booking.host_user_id).first()
-            if host and host.google_access_token and host.google_refresh_token:
+    """Cancel a booking and remove it from Google Calendar."""
+    try:
+        # Get the booking
+        booking = db.query(Booking).filter(Booking.id == booking_id).first()
+        if not booking:
+            return False
+        
+        # Check if user has permission to cancel
+        if user_id and booking.host_user_id != user_id:
+            return False
+        
+        # Try to delete from Google Calendar first
+        calendar_deleted = False
+        if booking.google_event_id and booking.host_user.google_calendar_connected:
+            try:
+                from app.services.google_calendar_service import GoogleCalendarService
                 calendar_service = GoogleCalendarService(
-                    access_token=host.google_access_token,
-                    refresh_token=host.google_refresh_token
+                    access_token=booking.host_user.google_access_token,
+                    refresh_token=booking.host_user.google_refresh_token,
+                    db=db,
+                    user_id=booking.host_user_id
                 )
-                calendar_service.delete_event(booking.google_event_id)
-        except Exception as e:
-            print(f"Failed to delete Google Calendar event: {e}")
-    
-    db.commit()
-    return True
+                
+                calendar_deleted = calendar_service.delete_event(booking.google_event_id)
+                if calendar_deleted:
+                    print(f"✅ Event cancelled in calendar and deleted in DB for booking {booking.id}")
+                else:
+                    print(f"⚠️ Event deleted in DB but calendar deletion failed for booking {booking.id}")
+                    
+            except Exception as e:
+                print(f"❌ Calendar deletion failed for booking {booking.id}: {e}")
+        
+        # Delete from database
+        db.delete(booking)
+        db.commit()
+        
+        if calendar_deleted:
+            print(f"✅ Booking {booking.id} cancelled: Event removed from calendar and DB")
+        else:
+            print(f"✅ Booking {booking.id} cancelled: Event removed from DB only")
+        
+        return True
+        
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Booking cancellation failed: {e}")
+        return False
 
 
 def get_upcoming_bookings(db: Session, user_id: int, limit: int = 10) -> List[Booking]:
@@ -488,14 +518,10 @@ def cancel_booking_by_id(db: Session, booking_id: str, user: User) -> Dict[str, 
         
         # Cancel the booking
         success = cancel_booking(db, booking_id_int, user.id)
-        if not success:
-            return {
-                "success": False,
-                "message": "Failed to cancel booking",
-                "source": "database",
-                "calendar_deleted": False,
-                "emails_sent": False
-            }
+        if success:
+            print(f"✅ Booking {booking.id} cancelled successfully (database)")
+        else:
+            print(f"❌ Booking {booking.id} cancellation failed (database)")
         
         # Send email notifications if Google tokens are available
         emails_sent = False
@@ -531,144 +557,87 @@ def cancel_booking_by_id(db: Session, booking_id: str, user: User) -> Dict[str, 
 
 
 def reschedule_booking_by_id(db: Session, booking_id: int, new_start_time: datetime, new_end_time: datetime, user: User, reason: str = "") -> Dict[str, Any]:
-    """Reschedule a booking with full calendar and notification handling."""
-    # Get the current booking
-    booking = get_booking(db, booking_id, user.id)
-    if not booking:
-        return {
-            "success": False,
-            "message": "Booking not found",
-            "calendar_updated": False,
-            "emails_sent": False
-        }
-    
-    # Store original times for rollback
-    original_start_time = booking.start_time
-    original_end_time = booking.end_time
-    original_event_id = booking.google_event_id
-    
-    # Create booking update
-    from app.schemas.schemas import BookingUpdate
-    booking_update = BookingUpdate(
-        start_time=new_start_time,
-        end_time=new_end_time,
-        status="rescheduled"
-    )
-    
-    # Update booking in database (but don't let it update calendar - we'll do that separately)
-    updated_booking = update_booking(db, booking_id, booking_update, user.id, update_calendar=False)
-    if not updated_booking:
-        return {
-            "success": False,
-            "message": "Failed to update booking in database",
-            "calendar_updated": False,
-            "emails_sent": False
-        }
-    
-    # Handle calendar event update/creation
-    calendar_updated = False
-    calendar_event_id = None
-    
-    if user.google_access_token and user.google_refresh_token:
-        try:
-            calendar_service = GoogleCalendarService(
-                access_token=user.google_access_token,
-                refresh_token=user.google_refresh_token,
-                db=db,
-                user_id=user.id
-            )
-            
-            if booking.google_event_id:
-                # Check if event exists and update it
-                existing_event = calendar_service.get_event(booking.google_event_id)
-                if existing_event:
-                    calendar_service.update_event(
-                        event_id=booking.google_event_id,
-                        start_time=new_start_time,
-                        end_time=new_end_time
-                    )
-                    calendar_event_id = booking.google_event_id
-                else:
-                    # Event not found, create new one
-                    created_event = calendar_service.create_booking_event(
-                        title=f"Meeting with {booking.guest_name}",
-                        start_time=new_start_time,
-                        end_time=new_end_time,
-                        guest_email=booking.guest_email,
-                        host_email=user.email,
-                        description=f"Rescheduled meeting with {booking.guest_name}\n\nGuest: {booking.guest_name}\nEmail: {booking.guest_email}"
-                    )
-                    calendar_event_id = created_event.get('id')
-                    booking.google_event_id = calendar_event_id
-                    db.commit()
-            else:
-                # No existing event, create new one
-                created_event = calendar_service.create_booking_event(
+    """Reschedule a booking and update Google Calendar event."""
+    try:
+        # Get the booking
+        booking = db.query(Booking).filter(Booking.id == booking_id).first()
+        if not booking:
+            return {"success": False, "message": "Booking not found"}
+        
+        # Check if user has permission to reschedule
+        if booking.host_user_id != user.id:
+            return {"success": False, "message": "Permission denied"}
+        
+        # Update booking times
+        old_start_time = booking.start_time
+        old_end_time = booking.end_time
+        
+        booking.start_time = new_start_time
+        booking.end_time = new_end_time
+        booking.updated_at = datetime.utcnow()
+        
+        # Try to update Google Calendar event
+        calendar_updated = False
+        if booking.google_event_id and user.google_calendar_connected:
+            try:
+                from app.services.google_calendar_service import GoogleCalendarService
+                calendar_service = GoogleCalendarService(
+                    access_token=user.google_access_token,
+                    refresh_token=user.google_refresh_token,
+                    db=db,
+                    user_id=user.id
+                )
+                
+                # Update calendar event
+                updated_event = calendar_service.update_event(
+                    event_id=booking.google_event_id,
                     title=f"Meeting with {booking.guest_name}",
                     start_time=new_start_time,
                     end_time=new_end_time,
-                    guest_email=booking.guest_email,
-                    host_email=user.email,
-                    description=f"Rescheduled meeting with {booking.guest_name}\n\nGuest: {booking.guest_name}\nEmail: {booking.guest_email}"
+                    description=booking.guest_message
                 )
-                calendar_event_id = created_event.get('id')
-                booking.google_event_id = calendar_event_id
-                db.commit()
-            
-            calendar_updated = True
-            
-        except Exception as e:
-            # Rollback database changes if calendar failed
-            if booking.google_event_id != original_event_id:
-                booking.google_event_id = original_event_id
-                db.commit()
-            
-            return {
-                "success": False,
-                "message": f"Failed to update Google Calendar: {str(e)}",
-                "calendar_updated": False,
-                "emails_sent": False
-            }
-    
-    # Send email notifications
-    emails_sent = False
-    if user.google_access_token and user.google_refresh_token:
-        try:
-            from app.services.notification_service import NotificationService
-            
-            notification_service = NotificationService()
-            
-            notification_results = notification_service.send_reschedule_notifications(
-                guest_email=booking.guest_email,
-                guest_name=booking.guest_name,
-                host_email=user.email,
-                host_name=user.full_name,
-                booking=updated_booking,
-                old_start_time=original_start_time,
-                reason=reason,
-                host_access_token=user.google_access_token,
-                host_refresh_token=user.google_refresh_token
-            )
-            
-            emails_sent = notification_results["success"]
-        except Exception as e:
-            print(f"Failed to send reschedule notifications: {e}")
-            emails_sent = False
-    
-    return {
-        "success": True,
-        "message": "Booking rescheduled successfully",
-        "calendar_updated": calendar_updated,
-        "emails_sent": emails_sent,
-        "booking": updated_booking
-    } 
+                
+                if updated_event:
+                    calendar_updated = True
+                    booking.sync_status = "synced"
+                    booking.last_synced = datetime.utcnow()
+                    print(f"✅ Event rescheduled in calendar and updated in DB for booking {booking.id}")
+                else:
+                    booking.sync_status = "failed"
+                    booking.sync_error = "Calendar event update failed"
+                    print(f"⚠️ Event updated in DB but calendar update failed for booking {booking.id}")
+                    
+            except Exception as e:
+                booking.sync_status = "failed"
+                booking.sync_error = str(e)
+                print(f"❌ Calendar update failed for booking {booking.id}: {e}")
+        
+        # Commit changes
+        db.commit()
+        
+        if calendar_updated:
+            print(f"✅ Booking {booking.id} rescheduled: Event updated in calendar and DB")
+        else:
+            print(f"✅ Booking {booking.id} rescheduled: Event updated in DB only")
+        
+        return {
+            "success": True,
+            "message": "Booking rescheduled successfully",
+            "booking_id": booking.id,
+            "calendar_updated": calendar_updated
+        }
+        
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Booking rescheduling failed: {e}")
+        return {"success": False, "message": f"Rescheduling failed: {str(e)}"}
 
 
 def format_bookings_for_template(db: Session, user_id: int, user: User) -> List[Dict[str, Any]]:
     """Format bookings data for template display with proper field names."""
     from datetime import datetime, timedelta, timezone
     
-    # Get database bookings
+    # Get database bookings only (database-as-source-of-truth)
     db_bookings = get_bookings_for_user(db, user_id)
     
     # Convert database bookings to template format
@@ -683,59 +652,10 @@ def format_bookings_for_template(db: Session, user_id: int, user: User) -> List[
             "status": booking.status,
             "source": "database",
             "guest_message": booking.guest_message,
-            "datetime": booking.start_time
+            "datetime": booking.start_time,
+            "google_event_id": booking.google_event_id,
+            "sync_status": booking.sync_status
         })
-    
-    # Get calendar events if connected
-    if user.google_calendar_connected and user.google_access_token:
-        try:
-            calendar_service = GoogleCalendarService(
-                access_token=user.google_access_token,
-                refresh_token=user.google_refresh_token,
-                db=db,
-                user_id=user.id
-            )
-            
-            # Get events from past 30 days to next 30 days
-            start_date = datetime.now(timezone.utc) - timedelta(days=30)
-            end_date = datetime.now(timezone.utc) + timedelta(days=30)
-            calendar_events = calendar_service.get_events(start_date, end_date)
-            
-            # Process calendar events
-            for event in calendar_events:
-                event_start = event.get('start', {}).get('dateTime')
-                event_end = event.get('end', {}).get('dateTime')
-                
-                if event_start and event_end:
-                    # Handle timezone-aware datetime parsing
-                    if event_start.endswith('Z'):
-                        event_start_dt = datetime.fromisoformat(event_start.replace('Z', '+00:00'))
-                    else:
-                        event_start_dt = datetime.fromisoformat(event_start)
-                    
-                    if event_end.endswith('Z'):
-                        event_end_dt = datetime.fromisoformat(event_end.replace('Z', '+00:00'))
-                    else:
-                        event_end_dt = datetime.fromisoformat(event_end)
-                    
-                    # Add to all bookings
-                    all_bookings.append({
-                        "id": f"calendar_{event.get('id')}",
-                        "guest_name": event.get('summary', 'Untitled Event'),
-                        "guest_email": event.get('organizer', {}).get('email', ''),
-                        "start_time": event_start_dt.strftime("%B %d, %Y at %I:%M %p"),
-                        "end_time": event_end_dt.strftime("%I:%M %p"),
-                        "status": "confirmed",
-                        "source": "calendar",
-                        "calendar_id": event.get('id'),
-                        "description": event.get('description', ''),
-                        "location": event.get('location', ''),
-                        "guest_message": event.get('description', ''),
-                        "datetime": event_start_dt
-                    })
-            
-        except Exception as e:
-            print(f"Error accessing Google Calendar: {e}")
     
     return all_bookings 
 

@@ -12,6 +12,7 @@ from app.services.booking_service import create_booking
 from app.schemas.schemas import PublicBookingCreate, BookingConfirmation
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.timezone_utils import TimezoneManager, parse_user_datetime
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -43,6 +44,7 @@ async def get_user_availability(
     db: Session = Depends(get_db),
 ) -> JSONResponse:
     """Get available time slots for a specific date."""
+    
     user = get_user_by_scheduling_slug(db, scheduling_slug)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -92,6 +94,7 @@ async def create_public_booking(
     guest_notes: str = Form(None),
     selected_date: str = Form(...),
     selected_time: str = Form(...),
+    guest_timezone: str = Form(None),  # Guest's timezone
     db: Session = Depends(get_db),
 ) -> JSONResponse:
     """Create a booking for the public interface."""
@@ -100,19 +103,37 @@ async def create_public_booking(
         raise HTTPException(status_code=404, detail="User not found")
     
     try:
-        # Parse the selected date and time (now using ISO format)
-        date_obj = datetime.strptime(selected_date, "%Y-%m-%d")
-        start_time = datetime.fromisoformat(selected_time)
+        # Get host's timezone
+        host_timezone = TimezoneManager.get_user_timezone(user.timezone)
         
-        # Ensure timezone-naive for consistency
-        start_time = start_time.replace(tzinfo=None) if start_time.tzinfo else start_time
-        end_time = start_time + timedelta(minutes=30)
+        # Parse the selected date and time from guest's timezone
+        guest_tz = guest_timezone or "UTC"
+        
+        # Parse the datetime from guest's timezone and convert to host's timezone
+        if selected_time.endswith('Z') or '+' in selected_time:
+            # Already in UTC, convert to host timezone
+            start_time = datetime.fromisoformat(selected_time.replace('Z', '+00:00'))
+            host_start_time = TimezoneManager.convert_from_utc(start_time, host_timezone)
+        else:
+            # Parse as guest's local time and convert to host timezone
+            # selected_time is already an ISO datetime string, so parse it directly
+            guest_start_time = datetime.fromisoformat(selected_time)
+            # Check if it's already timezone-aware
+            if guest_start_time.tzinfo is None:
+                # Make it timezone-aware in guest's timezone
+                guest_start_time = TimezoneManager.make_timezone_aware(guest_start_time, guest_tz)
+            # Convert to host timezone
+            host_start_time = TimezoneManager.convert_to_utc(guest_start_time, host_timezone)
+        
+        # Ensure timezone-aware for consistency
+        host_start_time = TimezoneManager.make_timezone_aware(host_start_time, host_timezone)
+        host_end_time = host_start_time + timedelta(minutes=30)
         
         # Find the availability slot
         availability_service = AvailabilityService(db)
         available_slots = availability_service.get_user_availability_slots(
             user_id=user.id,
-            date=date_obj,
+            date=host_start_time.date(),
             duration_minutes=30
         )
         
@@ -120,12 +141,12 @@ async def create_public_booking(
         matching_slot = None
         for slot in available_slots:
             slot_start = datetime.fromisoformat(slot['start_time'])
-            # Ensure both are timezone-naive for comparison
-            slot_start_naive = slot_start.replace(tzinfo=None) if slot_start.tzinfo else slot_start
-            start_time_naive = start_time.replace(tzinfo=None) if start_time.tzinfo else start_time
+            # Convert slot time to host timezone for comparison
+            slot_start_host = TimezoneManager.make_timezone_aware(slot_start, host_timezone)
             
-            # Compare the full datetime (date + time)
-            if slot_start_naive == start_time_naive:
+            # Compare times (allow 5-minute tolerance for timezone conversion)
+            time_diff = abs((slot_start_host - host_start_time).total_seconds())
+            if time_diff <= 300:  # 5 minutes tolerance
                 matching_slot = slot
                 break
         
@@ -149,7 +170,9 @@ async def create_public_booking(
             "success": True,
             "message": "Booking confirmed successfully!",
             "booking_id": booking.id,
-            "email_sent": True
+            "email_sent": True,
+            "host_timezone": host_timezone,
+            "guest_timezone": guest_tz
         })
         
     except ValueError as e:

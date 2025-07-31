@@ -1,15 +1,21 @@
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
+from app.core.calendar_architecture import BaseCalendarProvider, CalendarProviderType
+from app.core.database import get_db
+from app.models.models import User
+from app.core.timezone_utils import TimezoneManager, ensure_utc_datetime
 
-class GoogleCalendarService:
+
+class GoogleCalendarService(BaseCalendarProvider):
     def __init__(self, access_token: str = None, refresh_token: str = None, db: Optional[Any] = None, user_id: Optional[int] = None):
+        super().__init__(access_token, refresh_token, db, user_id)
         self.credentials = None
         self.db = db
         self.user_id = user_id
@@ -28,6 +34,10 @@ class GoogleCalendarService:
                     "https://www.googleapis.com/auth/calendar.readonly"
                 ],
             )
+    
+    def _get_provider_type(self) -> CalendarProviderType:
+        """Return the Google Calendar provider type."""
+        return CalendarProviderType.GOOGLE
 
     def get_authorization_url(self):
         flow = InstalledAppFlow.from_client_secrets_file(
@@ -62,42 +72,44 @@ class GoogleCalendarService:
         }
 
     def _ensure_valid_credentials(self):
-        """Ensure credentials are valid and refresh if needed."""
-        if not self.credentials:
-            raise Exception("Google credentials not set.")
-
-        # Use our TokenRefreshService for proper token refresh
-        if not self.db or not self.user_id:
-            raise Exception("Database and user_id required for token refresh")
-            
-        from app.services.token_refresh_service import TokenRefreshService
-        from app.models.models import User
-        
-        # Get user from database
-        user = self.db.query(User).filter(User.id == self.user_id).first()
-        if not user:
-            raise Exception("User not found")
-        
-        # Use token refresh service
-        token_service = TokenRefreshService(self.db)
-        result = token_service.ensure_valid_tokens(user)
-        
-        if result["success"]:
-            # Update credentials with new tokens
-            self.credentials = Credentials(
-                token=result["access_token"],
-                refresh_token=result["refresh_token"],
-                token_uri="https://oauth2.googleapis.com/token",
-                client_id=os.getenv("GOOGLE_CLIENT_ID"),
-                client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-                scopes=[
-                    "https://www.googleapis.com/auth/calendar",
-                    "https://www.googleapis.com/auth/calendar.events",
-                    "https://www.googleapis.com/auth/calendar.readonly"
-                ],
-            )
-        else:
-            raise Exception("Token refresh failed: " + result["message"])
+        """Ensure valid credentials for Google Calendar API."""
+        if not self.credentials or self.credentials.expired:
+            if self.refresh_token:
+                # Use token refresh service
+                from app.services.token_refresh_service import TokenRefreshService
+                
+                # Get user from database
+                user = self.db.query(User).filter(User.id == self.user_id).first()
+                if not user:
+                    raise Exception("User not found")
+                
+                # Use token refresh service
+                token_service = TokenRefreshService(self.db)
+                result = token_service.ensure_valid_tokens(user)
+                
+                if result["success"]:
+                    # Update credentials with new tokens
+                    self.credentials = Credentials(
+                        token=result["access_token"],
+                        refresh_token=result["refresh_token"],
+                        token_uri="https://oauth2.googleapis.com/token",
+                        client_id=os.getenv("GOOGLE_CLIENT_ID"),
+                        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+                        scopes=[
+                            "https://www.googleapis.com/auth/calendar",
+                            "https://www.googleapis.com/auth/calendar.events",
+                            "https://www.googleapis.com/auth/calendar.readonly"
+                        ],
+                    )
+                else:
+                    raise Exception("Token refresh failed: " + result["message"])
+            else:
+                raise Exception("No refresh token available")
+    
+    def _get_calendar_service(self):
+        """Get the Google Calendar service instance."""
+        self._ensure_valid_credentials()
+        return build('calendar', 'v3', credentials=self.credentials)
 
     def _handle_google_api_error(self, error):
         """Handle Google API errors."""
@@ -139,17 +151,15 @@ class GoogleCalendarService:
         self._ensure_valid_credentials()
         service = build('calendar', 'v3', credentials=self.credentials)
         
-        # Ensure datetime objects are timezone-aware
-        if start_time.tzinfo is None:
-            start_time = start_time.replace(tzinfo=timezone.utc)
-        if end_time.tzinfo is None:
-            end_time = end_time.replace(tzinfo=timezone.utc)
+        # Ensure datetime objects are timezone-aware using our utility
+        utc_start_time = ensure_utc_datetime(start_time)
+        utc_end_time = ensure_utc_datetime(end_time)
         
         # Get events that overlap with the requested time slot
         events_result = service.events().list(
             calendarId='primary',
-            timeMin=start_time.isoformat(),
-            timeMax=end_time.isoformat(),
+            timeMin=utc_start_time.isoformat(),
+            timeMax=utc_end_time.isoformat(),
             singleEvents=True
         ).execute()
         
@@ -317,6 +327,10 @@ class GoogleCalendarService:
         location: Optional[str] = None
     ) -> Dict[str, Any]:
         """Update an existing calendar event."""
+        if not event_id:
+            print(f"Cannot update event: event_id is None or empty")
+            return None
+            
         try:
             print(f"Updating event: {event_id}")
             self._ensure_valid_credentials()
@@ -373,6 +387,10 @@ class GoogleCalendarService:
 
     def delete_event(self, event_id: str) -> bool:
         """Delete a calendar event."""
+        if not event_id:
+            print(f"Cannot delete event: event_id is None or empty")
+            return False
+            
         try:
             self._ensure_valid_credentials()
             service = build('calendar', 'v3', credentials=self.credentials)
@@ -385,6 +403,10 @@ class GoogleCalendarService:
 
     def get_event(self, event_id: str) -> Optional[Dict[str, Any]]:
         """Get a specific calendar event."""
+        if not event_id:
+            print(f"Cannot get event: event_id is None or empty")
+            return None
+            
         try:
             print(f"Getting event: {event_id}")
             self._ensure_valid_credentials()
