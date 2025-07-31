@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Email Verification - SmartCal{% endblock %}
+
+{% block content %}
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .verification-container {
+        background: white;
+        border-radius: 16px;
+        padding: 40px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        text-align: center;
+        max-width: 480px;
+        width: 90%;
+    }
+
+    .verification-icon {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .verification-icon.success {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .verification-icon.error {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+
+    .verification-title {
+        font-size: 24px;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 12px;
+    }
+
+    .verification-message {
+        font-size: 16px;
+        color: #64748b;
+        margin-bottom: 32px;
+        line-height: 1.6;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 25px rgba(30, 60, 114, 0.3);
+    }
+</style>
+
+<div class="verification-container">
+    <div class="verification-icon {% if success %}success{% else %}error{% endif %}">
+        {% if success %}
+        <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+        </svg>
+        {% else %}
+        <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+        </svg>
+        {% endif %}
+    </div>
+
+    <h1 class="verification-title">
+        {% if success %}Email Verified!{% else %}Verification Failed{% endif %}
+    </h1>
+
+    <p class="verification-message">{{ message }}</p>
+
+    <a href="/login" class="btn-primary">
+        {% if success %}Continue to Login{% else %}Try Again{% endif %}
+    </a>
+</div>
+{% endblock %} 

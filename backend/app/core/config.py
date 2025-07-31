@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     
     # App settings
-    PROJECT_NAME: str = "Appointment Agent"
+    PROJECT_NAME: str = "SmartCal"
     DEBUG: bool = True
     
     # Frontend URL

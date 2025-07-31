@@ -29,7 +29,15 @@ def create_slot(
     current_user: User = Depends(get_current_active_user),
 ):
     """Create a new availability slot."""
-    return create_availability_slot(db=db, slot=slot, user_id=current_user.id)
+    result = create_availability_slot(db=db, slot=slot, user_id=current_user.id)
+    
+    if not result["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=result["message"]
+        )
+    
+    return result["slot"]
 
 
 @router.get("/", response_model=List[AvailabilitySlot])
@@ -156,4 +164,8 @@ def delete_slot(
             detail=result["message"]
         )
     
-    return result 
+    # Return a clean success response
+    return {
+        "success": True,
+        "message": result["message"]
+    } 
