@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +22,12 @@ from app.core.database import Base, engine
 
 # Import routers
 from app.routers import auth, dashboard, bookings, settings as settings_router, public, availability
+
+# Import new calendar sync endpoints
+from app.api.v1.endpoints import calendar_sync, webhooks
+
+# Import background sync service
+from app.services.sync.background_sync import BackgroundSyncService
 
 # Create database tables (only create if they don't exist)
 Base.metadata.create_all(bind=engine)
@@ -60,6 +67,33 @@ app.include_router(bookings.router, tags=["Bookings"])
 app.include_router(settings_router.router, tags=["Settings"])
 app.include_router(availability.router, tags=["Availability"])
 app.include_router(public.router, tags=["Public"])
+
+# Include new calendar sync and webhook endpoints
+app.include_router(calendar_sync.router, tags=["Calendar Sync"])
+app.include_router(webhooks.router, tags=["Webhooks"])
+
+# Background sync service instance
+background_sync_service = None
+
+@app.on_event("startup")
+async def startup_event():
+    """Start background sync service on application startup."""
+    global background_sync_service
+    try:
+        background_sync_service = BackgroundSyncService()
+        # Start background sync in a separate task
+        asyncio.create_task(background_sync_service.start_periodic_sync())
+        logging.info("Background sync service started successfully")
+    except Exception as e:
+        logging.error(f"Failed to start background sync service: {e}")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop background sync service on application shutdown."""
+    global background_sync_service
+    if background_sync_service:
+        await background_sync_service.stop_periodic_sync()
+        logging.info("Background sync service stopped")
 
 # Root redirect
 @app.get("/")

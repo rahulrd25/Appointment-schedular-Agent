@@ -43,8 +43,10 @@ async def login_post(
             key="access_token",
             value=access_token,
             httponly=True,
-            max_age=3600,  # 1 hour
-            samesite="lax"
+            max_age=86400,  # 24 hours (1440 minutes * 60 seconds)
+            samesite="lax",
+            secure=False,  # Set to True in production with HTTPS
+            path="/"  # Make cookie available across all paths
         )
         
         return response
@@ -99,8 +101,10 @@ async def register_post(
             key="access_token",
             value=access_token,
             httponly=True,
-            max_age=3600,  # 1 hour
-            samesite="lax"
+            max_age=86400,  # 24 hours (1440 minutes * 60 seconds)
+            samesite="lax",
+            secure=False,  # Set to True in production with HTTPS
+            path="/"  # Make cookie available across all paths
         )
         
         return response
@@ -197,8 +201,10 @@ async def connect_email(
             key="access_token",
             value=access_token,
             httponly=True,
-            max_age=3600,  # 1 hour
-            samesite="lax"
+            max_age=86400,  # 24 hours (1440 minutes * 60 seconds)
+            samesite="lax",
+            secure=False,  # Set to True in production with HTTPS
+            path="/"  # Make cookie available across all paths
         )
         
         return response

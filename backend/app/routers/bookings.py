@@ -106,15 +106,15 @@ async def get_bookings_data(request: Request, db: Session = Depends(get_db)):
         if not user:
             return {"error": "User not found"}
         
-        # Get database bookings
+        # Get all bookings from database (includes both local and calendar-synced)
         from app.services.booking_service import get_bookings_for_user
-        db_bookings = get_bookings_for_user(db, user.id)
+        all_db_bookings = get_bookings_for_user(db, user.id)
         
         # Use timezone-aware current time for database comparisons
         current_time = datetime.now()
-        upcoming_db_bookings = []
+        upcoming_bookings = []
         
-        for booking in db_bookings:
+        for booking in all_db_bookings:
             # Ensure both times are timezone-aware for comparison
             booking_time = booking.start_time
             if booking_time.tzinfo is None:
@@ -126,11 +126,11 @@ async def get_bookings_data(request: Request, db: Session = Depends(get_db)):
                 current_time = current_time.replace(tzinfo=timezone.utc)
             
             if booking_time > current_time:
-                upcoming_db_bookings.append(booking)
+                upcoming_bookings.append(booking)
         
-        # Convert database bookings to dashboard format
+        # Convert all bookings to dashboard format (both database and calendar-synced)
         all_bookings = []
-        for booking in upcoming_db_bookings:
+        for booking in upcoming_bookings:
             all_bookings.append({
                 "id": booking.id,
                 "title": booking.guest_name,
@@ -139,69 +139,13 @@ async def get_bookings_data(request: Request, db: Session = Depends(get_db)):
                 "end_time": booking.end_time.strftime("%H:%M"),
                 "email": booking.guest_email,
                 "status": booking.status,
-                "source": "database",
+                "source": "calendar" if booking.google_event_id else "database",
                 "guest_message": booking.guest_message,
-                "datetime": booking.start_time
+                "datetime": booking.start_time,
+                "calendar_id": booking.google_event_id if booking.google_event_id else None,
+                "description": None,  # Database bookings don't have description field
+                "location": None      # Database bookings don't have location field
             })
-        
-        # Get calendar events if connected
-        if user.google_calendar_connected and user.google_access_token:
-            try:
-                from app.services.google_calendar_service import GoogleCalendarService
-                
-                # Initialize Google Calendar service
-                calendar_service = GoogleCalendarService(
-                    access_token=user.google_access_token,
-                    refresh_token=user.google_refresh_token,
-                    db=db,
-                    user_id=user.id
-                )
-                
-                # Get events from past 7 days to next 30 days (reduced range for performance)
-                start_date = datetime.now(timezone.utc) - timedelta(days=7)
-                end_date = datetime.now(timezone.utc) + timedelta(days=30)
-                calendar_events = calendar_service.get_events(start_date, end_date)
-                
-                # Process calendar events
-                for event in calendar_events:
-                    event_start = event.get('start', {}).get('dateTime')
-                    event_end = event.get('end', {}).get('dateTime')
-                    
-                    if event_start and event_end:
-                        # Handle timezone-aware datetime parsing
-                        if event_start.endswith('Z'):
-                            event_start_dt = datetime.fromisoformat(event_start.replace('Z', '+00:00'))
-                        else:
-                            event_start_dt = datetime.fromisoformat(event_start)
-                        
-                        if event_end.endswith('Z'):
-                            event_end_dt = datetime.fromisoformat(event_end.replace('Z', '+00:00'))
-                        else:
-                            event_end_dt = datetime.fromisoformat(event_end)
-                        
-                        event_date = event_start_dt.strftime("%Y-%m-%d")
-                        event_start_time = event_start_dt.strftime("%H:%M")
-                        event_end_time = event_end_dt.strftime("%H:%M")
-                        
-                        # Add to all bookings
-                        all_bookings.append({
-                            "id": f"calendar_{event.get('id')}",
-                            "title": event.get('summary', 'Untitled Event'),
-                            "date": event_date,
-                            "time": event_start_time,
-                            "end_time": event_end_time,
-                            "email": event.get('organizer', {}).get('email', ''),
-                            "status": "confirmed",
-                            "source": "calendar",
-                            "calendar_id": event.get('id'),
-                            "description": event.get('description', ''),
-                            "location": event.get('location', ''),
-                            "guest_message": None
-                        })
-                
-            except Exception as e:
-                print(f"Error accessing Google Calendar: {e}")
-                # Continue with database data only
         
         # Sort all bookings by date and time
         all_bookings.sort(key=lambda x: (x['date'], x['time']), reverse=True)
@@ -235,55 +179,19 @@ async def get_bookings_stats(request: Request, db: Session = Depends(get_db)):
         if not user:
             return {"error": "User not found"}
         
-        # Get database bookings
+        # Get all bookings from database (includes both local and calendar-synced)
         from app.services.booking_service import get_bookings_for_user
-        db_bookings = get_bookings_for_user(db, user.id)
+        all_bookings = get_bookings_for_user(db, user.id)
         
-        # Count database bookings by status
-        total_db = len(db_bookings)
-        confirmed_db = len([b for b in db_bookings if b.status == "confirmed"])
-        cancelled_db = len([b for b in db_bookings if b.status == "cancelled"])
-        upcoming_db = len([b for b in db_bookings if b.start_time > datetime.now(timezone.utc)])
+        # Count all bookings by status
+        total_bookings = len(all_bookings)
+        confirmed_bookings = len([b for b in all_bookings if b.status == "confirmed"])
+        cancelled_bookings = len([b for b in all_bookings if b.status == "cancelled"])
+        upcoming_bookings = len([b for b in all_bookings if b.start_time > datetime.now(timezone.utc)])
         
-        # Get calendar events if connected
-        calendar_events = []
-        if user.google_calendar_connected and user.google_access_token:
-            try:
-                from app.services.google_calendar_service import GoogleCalendarService
-                
-                calendar_service = GoogleCalendarService(
-                    access_token=user.google_access_token,
-                    refresh_token=user.google_refresh_token,
-                    db=db,
-                    user_id=user.id
-                )
-                
-                # Get events from past 30 days to next 30 days
-                start_date = datetime.now(timezone.utc) - timedelta(days=30)
-                end_date = datetime.now(timezone.utc) + timedelta(days=30)
-                calendar_events = calendar_service.get_events(start_date, end_date)
-                
-            except Exception as e:
-                print(f"Error accessing Google Calendar: {e}")
-        
-        # Count calendar events
-        total_calendar = len(calendar_events)
-        upcoming_calendar = 0
-        
-        for event in calendar_events:
-            event_start = event.get('start', {}).get('dateTime')
-            if event_start:
-                if event_start.endswith('Z'):
-                    event_start_dt = datetime.fromisoformat(event_start.replace('Z', '+00:00'))
-                else:
-                    event_start_dt = datetime.fromisoformat(event_start)
-                
-                if event_start_dt > datetime.now(timezone.utc):
-                    upcoming_calendar += 1
-        
-        # Calculate totals
-        total_bookings = total_db + total_calendar
-        total_upcoming = upcoming_db + upcoming_calendar
+        # Count calendar vs database bookings
+        calendar_bookings = len([b for b in all_bookings if b.google_event_id])
+        database_bookings = len([b for b in all_bookings if not b.google_event_id])
         
         # Render the stats template
         from fastapi.templating import Jinja2Templates
@@ -292,9 +200,11 @@ async def get_bookings_stats(request: Request, db: Session = Depends(get_db)):
         return templates.TemplateResponse("booking_stats.html", {
             "request": request,
             "total": total_bookings,
-            "confirmed": confirmed_db,
-            "cancelled": cancelled_db,
-            "upcoming": total_upcoming
+            "confirmed": confirmed_bookings,
+            "cancelled": cancelled_bookings,
+            "upcoming": upcoming_bookings,
+            "calendarBookings": calendar_bookings,
+            "databaseBookings": database_bookings
         })
         
     except Exception as e:

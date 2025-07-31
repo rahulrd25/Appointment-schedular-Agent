@@ -3,13 +3,13 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from fastapi.templating import Jinja2Templates
 from datetime import datetime, timedelta, timezone
+from typing import Dict, Any, List
 
 from app.core.database import get_db
-from app.services.user_service import get_user_by_email
 from app.core.security import verify_token
+from app.services.user_service import get_user_by_email
 from app.services.booking_service import get_bookings_for_user, get_upcoming_bookings
 from app.services.availability_service import get_availability_slots_for_user
-from app.services.google_calendar_service import GoogleCalendarService
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -183,16 +183,25 @@ async def get_dashboard_data(request: Request, db: Session = Depends(get_db)):
         if not user:
             return {"error": "User not found"}
         
-        # Get upcoming bookings
-        upcoming_bookings = get_upcoming_bookings(db, user.id, limit=5)
-        
-        # Get all bookings
+        # Get all bookings from database (includes both local and calendar-synced)
+        from app.services.booking_service import get_bookings_for_user
         all_bookings = get_bookings_for_user(db, user.id)
         
+        # Get upcoming bookings (next 7 days)
+        from datetime import datetime, timezone, timedelta
+        upcoming_start = datetime.now(timezone.utc)
+        upcoming_end = datetime.now(timezone.utc) + timedelta(days=7)
+        
+        upcoming_bookings = [
+            booking for booking in all_bookings 
+            if booking.start_time >= upcoming_start and booking.start_time <= upcoming_end
+        ]
+        
         # Get available slots
+        from app.services.availability_service import get_availability_slots_for_user
         available_slots = get_availability_slots_for_user(db, user.id)
         
-        # Format upcoming bookings
+        # Format upcoming bookings (both database and calendar-synced)
         formatted_upcoming = []
         for booking in upcoming_bookings:
             formatted_upcoming.append({
@@ -203,47 +212,8 @@ async def get_dashboard_data(request: Request, db: Session = Depends(get_db)):
                 "end_time": booking.end_time.strftime("%H:%M"),
                 "email": booking.guest_email,
                 "status": booking.status,
-                "source": "database"
+                "source": "calendar" if booking.google_event_id else "database"
             })
-        
-        # Get calendar events if connected
-        calendar_events = []
-        if user.google_calendar_connected and user.google_access_token:
-            try:
-                calendar_service = GoogleCalendarService(
-                    access_token=user.google_access_token,
-                    refresh_token=user.google_refresh_token,
-                    db=db,
-                    user_id=user.id
-                )
-                
-                # Get events from today to next 7 days
-                start_date = datetime.now(timezone.utc)
-                end_date = datetime.now(timezone.utc) + timedelta(days=7)
-                calendar_events = calendar_service.get_events(start_date, end_date)
-                
-                # Format calendar events
-                for event in calendar_events:
-                    event_start = event.get('start', {}).get('dateTime')
-                    if event_start:
-                        if event_start.endswith('Z'):
-                            event_start_dt = datetime.fromisoformat(event_start.replace('Z', '+00:00'))
-                        else:
-                            event_start_dt = datetime.fromisoformat(event_start)
-                        
-                        if event_start_dt > datetime.now(timezone.utc):
-                            formatted_upcoming.append({
-                                "id": f"calendar_{event.get('id')}",
-                                "title": event.get('summary', 'No title'),
-                                "date": event_start_dt.strftime("%Y-%m-%d"),
-                                "time": event_start_dt.strftime("%H:%M"),
-                                "email": event.get('attendees', [{}])[0].get('email', 'No email'),
-                                "location": event.get('location', ''),
-                                "source": "calendar"
-                            })
-                
-            except Exception as e:
-                print(f"Error accessing Google Calendar: {e}")
         
         # Format available slots
         formatted_slots = []
@@ -256,10 +226,14 @@ async def get_dashboard_data(request: Request, db: Session = Depends(get_db)):
                 "duration": int((slot.end_time - slot.start_time).total_seconds() / 60)
             })
         
-        # Calculate stats
+        # Calculate stats from database
         upcoming_count = len(formatted_upcoming)
-        total_bookings = len(all_bookings) + len(calendar_events)
+        total_bookings = len(all_bookings)
         available_count = len(formatted_slots)
+        
+        # Count calendar vs database bookings
+        calendar_bookings = len([b for b in all_bookings if b.google_event_id])
+        database_bookings = len([b for b in all_bookings if not b.google_event_id])
         
         return {
             "upcomingBookings": formatted_upcoming,
@@ -268,7 +242,9 @@ async def get_dashboard_data(request: Request, db: Session = Depends(get_db)):
             "upcomingCount": upcoming_count,
             "totalBookings": total_bookings,
             "availableCount": available_count,
-            "calendarConnected": user.google_calendar_connected
+            "calendarConnected": user.google_calendar_connected,
+            "calendarBookings": calendar_bookings,
+            "databaseBookings": database_bookings
         }
         
     except Exception as e:
@@ -333,23 +309,26 @@ async def refresh_calendar_tokens_endpoint(request: Request, db: Session = Depen
             return {"error": "No Google Calendar tokens found"}
         
         # Refresh tokens
-        calendar_service = GoogleCalendarService(
-            access_token=user.google_access_token,
-            refresh_token=user.google_refresh_token,
-            db=db,
-            user_id=user.id
-        )
+        # calendar_service = GoogleCalendarService(
+        #     access_token=user.google_access_token,
+        #     refresh_token=user.google_refresh_token,
+        #     db=db,
+        #     user_id=user.id
+        # )
         
-        # This will automatically refresh tokens if needed
-        try:
-            # Test the connection
-            calendar_service.get_events(
-                start_date=datetime.now(timezone.utc),
-                end_date=datetime.now(timezone.utc) + timedelta(days=1)
-            )
-            return {"success": True, "message": "Calendar connection refreshed successfully"}
-        except Exception as e:
-            return {"error": f"Failed to refresh calendar connection: {str(e)}"}
+        # # This will automatically refresh tokens if needed
+        # try:
+        #     # Test the connection
+        #     calendar_service.get_events(
+        #         start_date=datetime.now(timezone.utc),
+        #         end_date=datetime.now(timezone.utc) + timedelta(days=1)
+        #     )
+        #     return {"success": True, "message": "Calendar connection refreshed successfully"}
+        # except Exception as e:
+        #     return {"error": f"Failed to refresh calendar connection: {str(e)}"}
+        
+        # Placeholder for actual token refresh logic if needed
+        return {"success": True, "message": "Calendar connection refresh is not yet implemented."}
         
     except Exception as e:
         print(f"Error in refresh_calendar_tokens: {e}")

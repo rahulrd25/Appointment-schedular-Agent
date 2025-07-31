@@ -98,31 +98,18 @@
 
         <!-- Time Slot Selection -->
         <div v-show="selectedDate && availableSlots.length > 0 && !selectedSlot" class="flex items-center justify-center min-h-screen w-full">
-            <div class="bg-gray-100 text-gray-900 rounded-xl shadow-lg w-[36rem] h-[36rem] max-w-[36rem] flex flex-col items-center justify-center p-10">
-                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                </div>
-                <h2 class="text-2xl font-bold mb-2">Perfect! I found available times</h2>
-                <p class="text-gray-600 mb-6">Let me show you the best options</p>
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-4 w-full">
-                                            <template v-for="slot in availableSlots" :key="slot.start_time">
-                        <button 
-                            @click="selectTimeSlotAndConfirm(slot)"
-                            class="bg-white border-2 border-gray-200 rounded-xl py-4 px-2 hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 text-center group relative overflow-hidden"
-                            :class="{ 'border-blue-500 bg-blue-100 shadow-xl': selectedSlot && selectedSlot.start_time === slot.start_time }"
-                        >
-                            <div class="relative z-10">
-                                                            <div class="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors" v-text="formatTime(slot.start_time)"></div>
-                            <div class="text-sm text-gray-500" v-text="formatTime(slot.end_time)"></div>
-                                <div class="mt-2 text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-1 inline-block">30 min</div>
+            <div class="bg-gray-100 text-gray-900 rounded-xl shadow-lg w-[36rem] max-w-[36rem] flex flex-col items-center justify-center p-10">
+                <h2 class="text-2xl font-bold mb-2">Select a time slot</h2>
+                <p class="text-sm text-gray-600 mb-6">All times shown in your local timezone ({{ userTimezone }})</p>
+                
+                <div class="grid grid-cols-2 gap-3 w-full max-h-96 overflow-y-auto">
+                    <template v-for="slot in availableSlots" :key="slot.id">
+                        <button @click="selectTimeSlotAndConfirm(slot)"
+                            class="p-4 bg-white rounded-lg border-2 border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all duration-200 text-left">
+                            <div class="font-semibold text-gray-900">
+                                {{ formatTime(slot.start_time) }} - {{ formatTime(slot.end_time) }}
                             </div>
-                            <div v-show="selectedSlot && selectedSlot.start_time === slot.start_time" class="absolute top-2 right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                </svg>
-                            </div>
+                            <div class="text-xs text-gray-500 mt-1">30 minutes</div>
                         </button>
                     </template>
                 </div>
@@ -256,6 +243,10 @@
                         <div class="flex justify-between">
                             <span class="font-medium">Time:</span>
                             <span>{{ selectedSlot ? formatTime(selectedSlot.start_time) + ' - ' + formatTime(selectedSlot.end_time) : '' }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="font-medium">Your Timezone:</span>
+                            <span>{{ userTimezone }}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="font-medium">Duration:</span>

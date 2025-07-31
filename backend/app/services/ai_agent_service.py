@@ -7,7 +7,6 @@ from app.models.models import User, AvailabilitySlot, Booking
 from app.services import availability_service
 from app.services import booking_service
 from app.services.google_calendar_service import GoogleCalendarService
-from app.services import email_service
 
 
 class AIAgentService:

@@ -1,11 +1,12 @@
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, or_
 
 from app.models.models import AvailabilitySlot, User, Booking
 from app.schemas.schemas import AvailabilitySlotCreate, AvailabilitySlotUpdate
+from app.core.timezone_utils import TimezoneManager, ensure_utc_datetime, parse_user_datetime
 
 
 def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id: int) -> dict:
@@ -22,14 +23,19 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
                 "google_event_id": None
             }
         
-        # Check for overlapping slots on the same date with proper error handling
+        # Ensure timezone-aware datetime objects for storage
+        user_timezone = TimezoneManager.get_user_timezone(user.timezone)
+        utc_start_time = ensure_utc_datetime(slot.start_time)
+        utc_end_time = ensure_utc_datetime(slot.end_time)
+        
+        # Check for overlapping slots on the same date with proper timezone handling
         try:
-            # Normalize timezone for comparison
-            normalized_start = slot.start_time.replace(tzinfo=None) if slot.start_time.tzinfo else slot.start_time
-            normalized_end = slot.end_time.replace(tzinfo=None) if slot.end_time.tzinfo else slot.end_time
+            # Convert to user's timezone for comparison
+            user_start_time = TimezoneManager.convert_from_utc(utc_start_time, user_timezone)
+            user_end_time = TimezoneManager.convert_from_utc(utc_end_time, user_timezone)
             
             # Get the date part for comparison
-            slot_date = normalized_start.date()
+            slot_date = user_start_time.date()
             
             # Check for any overlapping slots on the same date
             # Overlap occurs when:
@@ -42,19 +48,24 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
                     or_(
                         # Case 1: New slot overlaps with existing slot
                         and_(
-                            normalized_start < AvailabilitySlot.end_time,
-                            normalized_end > AvailabilitySlot.start_time
+                            utc_start_time < AvailabilitySlot.end_time,
+                            utc_end_time > AvailabilitySlot.start_time
                         ),
                         # Case 2: Same start time
-                        AvailabilitySlot.start_time == normalized_start
+                        AvailabilitySlot.start_time == utc_start_time
                     )
                 )
             ).first()
             
             if existing_overlapping_slot:
-                existing_time = existing_overlapping_slot.start_time.strftime("%I:%M %p")
-                existing_date = existing_overlapping_slot.start_time.strftime("%B %d, %Y")
-                existing_end_time = existing_overlapping_slot.end_time.strftime("%I:%M %p")
+                # Format times in user's timezone for display
+                existing_user_start = TimezoneManager.convert_from_utc(existing_overlapping_slot.start_time, user_timezone)
+                existing_user_end = TimezoneManager.convert_from_utc(existing_overlapping_slot.end_time, user_timezone)
+                
+                existing_time = existing_user_start.strftime("%I:%M %p")
+                existing_date = existing_user_start.strftime("%B %d, %Y")
+                existing_end_time = existing_user_end.strftime("%I:%M %p")
+                
                 return {
                     "success": False,
                     "message": f"You already have a slot from {existing_time} to {existing_end_time} on {existing_date}. Please choose a different time.",
@@ -103,8 +114,8 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
         try:
             db_slot = AvailabilitySlot(
                 user_id=user_id,
-                start_time=slot.start_time,
-                end_time=slot.end_time,
+                start_time=utc_start_time,
+                end_time=utc_end_time,
                 is_available=slot.is_available
             )
             db.add(db_slot)
@@ -133,11 +144,11 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
                     'summary': 'Available for Booking',
                     'description': 'Time slot available for appointments',
                     'start': {
-                        'dateTime': slot.start_time.isoformat(),
+                        'dateTime': utc_start_time.isoformat(),
                         'timeZone': 'UTC'
                     },
                     'end': {
-                        'dateTime': slot.end_time.isoformat(),
+                        'dateTime': utc_end_time.isoformat(),
                         'timeZone': 'UTC'
                     },
                     'transparency': 'opaque',  # Mark as busy
@@ -462,18 +473,48 @@ def create_availability_slots_from_calendar(db: Session, user: User, start_date:
 
 
 def check_calendar_connection(db: Session, user: User) -> dict:
-    """Simple check if calendar is connected - no token refresh."""
-    if not user.google_calendar_connected:
-        return {"success": False, "message": "Google Calendar not connected"}
-    
-    if not user.google_access_token:
-        return {"success": False, "message": "No access token available"}
-    
-    return {
-        "success": True,
-        "message": "Google Calendar connected",
-        "connected": True
-    }
+    """Check if user's Google Calendar is properly connected and working."""
+    try:
+        if not user.google_access_token or not user.google_refresh_token:
+            return {
+                "connected": False,
+                "message": "Google Calendar not connected",
+                "timezone": None
+            }
+        
+        # Test calendar connection
+        calendar_service = GoogleCalendarService(
+            access_token=user.google_access_token,
+            refresh_token=user.google_refresh_token,
+            db=db,
+            user_id=user.id
+        )
+        
+        # Test basic connection
+        events = calendar_service.get_events()
+        
+        # Detect timezone from Google Calendar
+        detected_timezone = TimezoneManager.detect_timezone_from_google_calendar(calendar_service)
+        
+        # Update user's timezone if it's different or not set
+        if user.timezone != detected_timezone:
+            user.timezone = detected_timezone
+            db.commit()
+            print(f"✅ Auto-detected timezone: {detected_timezone} for user {user.id}")
+        
+        return {
+            "connected": True,
+            "message": "Google Calendar connected successfully",
+            "timezone": detected_timezone,
+            "timezone_display": TimezoneManager.get_timezone_display_name(detected_timezone)
+        }
+        
+    except Exception as e:
+        return {
+            "connected": False,
+            "message": f"Calendar connection failed: {str(e)}",
+            "timezone": None
+        }
 
 
 class AvailabilityService:
@@ -488,8 +529,13 @@ class AvailabilityService:
         
         if date:
             # Filter by date - ensure timezone-naive comparison
-            date_start = date.replace(hour=0, minute=0, second=0, microsecond=0)
-            date_end = date.replace(hour=23, minute=59, second=59, microsecond=999999)
+            # Convert date to datetime objects for replace() calls
+            if hasattr(date, 'date'):  # Check if it's a datetime object
+                date_start = date.replace(hour=0, minute=0, second=0, microsecond=0)
+                date_end = date.replace(hour=23, minute=59, second=59, microsecond=999999)
+            else:  # It's a date object
+                date_start = datetime.combine(date, datetime.min.time())
+                date_end = datetime.combine(date, datetime.max.time())
             
             # Convert slots to timezone-naive for comparison
             filtered_slots = []

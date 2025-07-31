@@ -11,6 +11,8 @@ from app.core.database import get_db
 from app.services.user_service import get_user_by_email
 from app.core.security import verify_token, get_password_hash, verify_password
 from app.services.google_calendar_service import GoogleCalendarService
+from app.core.timezone_utils import TimezoneManager
+
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -81,6 +83,7 @@ async def update_profile(
     except Exception as e:
         print(f"Error updating profile: {e}")
         return {"error": str(e)}
+
 
 
 @router.post("/settings/api/calendar-preferences")

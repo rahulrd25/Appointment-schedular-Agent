@@ -381,8 +381,17 @@
         <div style="font-size: 16px; font-weight: 600; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; opacity: 0.9; margin-bottom: 15px;">{{ user.email }}</div>
         <h1 class="meeting-title">{{ user.meeting_title or '30 Minute Meeting' }}</h1>
         <div class="meeting-duration">⏰ {{ user.meeting_duration or 30 }} min</div>
+        
         <div class="meeting-description" style="font-size: 15px;">
             {{ (user.meeting_description or "Schedule your meeting with ease.\nFollow the steps below to book your appointment.") | replace('\n', '<br>') | safe }}
+        </div>
+        
+        <!-- Timezone Indicator -->
+        <div style="display: flex; align-items: center; gap: 8px; margin: 25px 0 15px 0;">
+            <svg style="width: 16px; height: 16px; color: white;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span style="color: white; font-size: 14px; opacity: 0.9; font-weight: bold;"><span v-text="getCurrentTimeInTimezone()"></span> (<span v-text="userTimezone"></span>)</span>
         </div>
     </div>
 
@@ -647,7 +656,9 @@ createApp({
             bookingError: null,
             calendarDays: [],
             availableTimes: [],
-            loadingSlots: false
+            loadingSlots: false,
+            userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            hostTimezone: '{{ user.timezone or "UTC" }}'
         }
     },
     computed: {
@@ -657,6 +668,16 @@ createApp({
     },
     mounted() {
         this.generateCalendar();
+        // Update current time every minute
+        this.timeUpdateInterval = setInterval(() => {
+            this.$forceUpdate(); // Force re-render to update time display
+        }, 60000); // Update every minute
+    },
+    beforeDestroy() {
+        // Clean up interval when component is destroyed
+        if (this.timeUpdateInterval) {
+            clearInterval(this.timeUpdateInterval);
+        }
     },
     methods: {
         previousMonth() {
@@ -739,6 +760,25 @@ createApp({
                 day: 'numeric'
             });
         },
+        
+        // Convert time to guest's timezone for display
+        formatTimeForGuest(timeString) {
+            const date = new Date(timeString);
+            return date.toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true,
+                timeZone: this.userTimezone
+            });
+        },
+        
+        // Convert guest's local time to host's timezone for booking
+        convertToHostTimezone(date) {
+            const guestDate = new Date(date);
+            const utcDate = new Date(guestDate.toLocaleString('en-US', { timeZone: this.userTimezone }));
+            return new Date(utcDate.toLocaleString('en-US', { timeZone: this.hostTimezone }));
+        },
+
         async fetchAvailableSlots() {
             if (!this.selectedDate) return;
             this.loadingSlots = true;
@@ -752,7 +792,7 @@ createApp({
                 if (response.ok) {
                     const data = await response.json();
                     this.availableTimes = data.available_slots.map(slot => ({
-                        display: slot.start_time,
+                        display: this.formatTimeForGuest(slot.start_time_iso),
                         iso: slot.start_time_iso
                     }));
                 } else {
@@ -788,6 +828,8 @@ createApp({
             const dateStr = `${year}-${month}-${day}`;
             formData.append('selected_date', dateStr);
             formData.append('selected_time', this.selectedTime.iso);
+            formData.append('guest_timezone', this.userTimezone);
+            
             try {
                 const response = await fetch(`/api/v1/public/{{ user.scheduling_slug }}/book`, {
                     method: 'POST',
@@ -827,13 +869,12 @@ createApp({
                     this.showPostSubmitLoader = false;
                 } else {
                     const error = await response.json();
-                    this.bookingError = error.detail || 'Booking failed. Please try again.';
+                    this.bookingError = error.detail || error.message || 'Booking failed. Please try again.';
                     this.isSubmitting = false;
                     this.showPostSubmitLoader = false;
                     this.step = 3;
                 }
             } catch (error) {
-                console.error('Booking error:', error);
                 this.bookingError = 'Network error. Please check your connection and try again.';
                 this.isSubmitting = false;
                 this.showPostSubmitLoader = false;
@@ -845,6 +886,15 @@ createApp({
             this.step = 3;
             this.bookingResult = null;
             this.bookingError = null;
+        },
+        getCurrentTimeInTimezone() {
+            const date = new Date();
+            return date.toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true,
+                timeZone: this.userTimezone
+            });
         }
     }
 }).mount('#booking-all-in-one-app')
