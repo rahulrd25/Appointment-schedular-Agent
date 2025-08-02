@@ -68,7 +68,11 @@ async def book_slot_public(
     return BookingConfirmation(
         booking=booking,
         message="Booking confirmed successfully! You will receive a confirmation email shortly.",
+<<<<<<< HEAD
         google_event_url=f"https://calendar.google.com/calendar/event?eid={booking.google_event_id}" if booking.google_event_id else None
+=======
+        google_event_url=None
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
     )
 
 

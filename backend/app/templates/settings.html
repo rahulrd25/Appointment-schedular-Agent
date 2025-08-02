@@ -14,8 +14,13 @@
         <header class="bg-white shadow-sm border-b">
             <div class="flex items-center justify-between px-6 py-4">
                 <div>
+<<<<<<< HEAD
                     <h1 class="text-xl font-bold text-black">Settings</h1>
                     <p class="text-black">Manage your account preferences and calendar settings</p>
+=======
+                    <h1 class="text-2xl font-semibold text-gray-900">Settings</h1>
+                    <p class="text-gray-600">Manage your account preferences and calendar settings</p>
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
                 </div>
                 <div class="flex items-center space-x-4">
                     <a href="/logout" class="text-black hover:text-gray-700">Logout</a>
@@ -29,7 +34,11 @@
                 <!-- Settings Navigation -->
                 <div class="w-64 flex-shrink-0">
                     <nav class="space-y-2">
+<<<<<<< HEAD
                         <button onclick="showSection('profile')" class="settings-nav-btn w-full text-left px-3 py-2 rounded-lg font-medium transition-colors text-base bg-blue-600 text-white" data-section="profile">
+=======
+                        <button onclick="showSection('profile')" class="settings-nav-btn w-full text-left px-3 py-2 rounded-lg font-medium transition-colors text-base" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white;" data-section="profile">
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
                             <div class="flex items-center">
                                 <svg class="w-6 h-6 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
@@ -61,6 +70,17 @@
                                 Security
                             </div>
                         </button>
+<<<<<<< HEAD
+=======
+                        <button onclick="showSection('personalization')" class="settings-nav-btn w-full text-left px-3 py-2 rounded-lg font-medium transition-colors text-base" data-section="personalization">
+                            <div class="flex items-center">
+                                <svg class="w-6 h-6 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM21 5a2 2 0 00-2-2h-4a2 2 0 00-2 2v12a4 4 0 004 4h4a2 2 0 002-2V5z"></path>
+                                </svg>
+                                Personalization
+                            </div>
+                        </button>
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
                     </nav>
                 </div>
 
@@ -113,7 +133,11 @@
                                 
                                 <div id="profile-message"></div>
                                 
+<<<<<<< HEAD
                                                                         <button type="submit" class="w-full bg-indigo-600 text-white py-2 px-3 rounded-lg hover:bg-indigo-700 transition-colors text-base font-medium">
+=======
+                                                                        <button type="submit" class="w-full text-white py-2 px-3 rounded-lg transition-colors text-base font-medium" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);" onmouseover="this.style.background='linear-gradient(135deg, #2a5298 0%, #1e3c72 100%)'" onmouseout="this.style.background='linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)'">
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
                                             Save Profile Changes
                                         </button>
                             </form>
@@ -146,10 +170,14 @@
                                         </div>
                                     </div>
                                     
+<<<<<<< HEAD
                                     <div class="space-y-4">
                                         <button onclick="syncCalendar()" class="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors text-base">
                                             Sync Calendar Now
                                         </button>
+=======
+                                    <div class="flex space-x-4">
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
                                         <button onclick="disconnectCalendar()" class="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition-colors text-base">
                                             Disconnect Calendar
                                         </button>
@@ -167,7 +195,11 @@
                                         </div>
                                     </div>
                                     
+<<<<<<< HEAD
                                     <a href="/auth/google/calendar" class="inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-base font-medium">
+=======
+                                    <a href="/api/v1/auth/google/calendar" class="inline-block text-white px-4 py-2 rounded-lg transition-colors text-base font-medium" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);" onmouseover="this.style.background='linear-gradient(135deg, #2a5298 0%, #1e3c72 100%)'" onmouseout="this.style.background='linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)'">
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
                                         Connect Google Calendar
                                     </a>
                                 {% endif %}
@@ -202,7 +234,11 @@
                                     
                                     <div id="calendar-message"></div>
                                     
+<<<<<<< HEAD
                                     <button type="submit" class="bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-base font-medium">
+=======
+                                    <button type="submit" class="text-white px-3 py-2 rounded-lg transition-colors text-base font-medium" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);" onmouseover="this.style.background='linear-gradient(135deg, #2a5298 0%, #1e3c72 100%)'" onmouseout="this.style.background='linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)'">
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
                                         Save Calendar Preferences
                                     </button>
                                 </form>
@@ -289,7 +325,11 @@
                                     
                                     <div id="password-message"></div>
                                     
+<<<<<<< HEAD
                                     <button type="submit" class="bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-base font-medium">
+=======
+                                    <button type="submit" class="text-white px-3 py-2 rounded-lg transition-colors text-base font-medium" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);" onmouseover="this.style.background='linear-gradient(135deg, #2a5298 0%, #1e3c72 100%)'" onmouseout="this.style.background='linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)'">
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
                                         Change Password
                                     </button>
                                 </form>
@@ -309,6 +349,138 @@
                             </div>
                         </div>
                     </div>
+<<<<<<< HEAD
+=======
+
+                    <!-- Personalization Section -->
+                    <div id="personalization-section" class="settings-section hidden">
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+                            <h2 class="text-xl font-semibold text-gray-900 mb-8">Public Booking Page Personalization</h2>
+                            
+                            <form hx-post="/settings/api/personalization" hx-target="#personalization-message" class="space-y-8">
+                                <!-- Profile Image -->
+                                <div>
+                                    <label class="block text-base font-medium text-gray-700 mb-3">Profile Image</label>
+                                    
+                                    <!-- Current Image Display -->
+                                    <div class="mb-4">
+                                        {% if current_user.profile_image_url %}
+                                            <div class="flex items-center space-x-4">
+                                                <img src="{{ current_user.profile_image_url if current_user.profile_image_url.startswith('http') else '/uploads/' + current_user.profile_image_url }}" 
+                                                     alt="Profile" 
+                                                     class="w-16 h-16 rounded-full object-cover border-2 border-gray-200">
+                                                <div>
+                                                    <p class="text-sm text-gray-600">Current profile image</p>
+                                                    <button type="button" onclick="removeProfileImage()" class="text-sm text-red-600 hover:text-red-800">
+                                                        Remove image
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <div class="flex items-center space-x-4">
+                                                <div class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-lg">
+                                                    {{ current_user.full_name.split()[0][:1].upper() + current_user.full_name.split()[-1][:1].upper() if current_user.full_name.split()|length > 1 else current_user.full_name[:2].upper() }}
+                                                </div>
+                                                <p class="text-sm text-gray-600">Using initials as profile picture</p>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- File Upload -->
+                                    <div class="mb-4">
+                                        <label for="profile_image_file" class="block text-sm font-medium text-gray-700 mb-2">Upload New Image</label>
+                                        <input type="file" id="profile_image_file" name="profile_image_file" 
+                                               accept="image/*"
+                                               class="w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base">
+                                        <p class="text-sm text-gray-500 mt-2">Supported formats: JPG, PNG, GIF, WebP (max 5MB)</p>
+                                        <button type="button" onclick="uploadProfileImage()" class="mt-2 text-white px-3 py-1 rounded-lg transition-colors text-sm" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);" onmouseover="this.style.background='linear-gradient(135deg, #2a5298 0%, #1e3c72 100%)'" onmouseout="this.style.background='linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)'">
+                                            Upload Image
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- URL Input (Alternative) -->
+                                    <div>
+                                        <label for="profile_image_url" class="block text-sm font-medium text-gray-700 mb-2">Or use image URL</label>
+                                        <input type="url" id="profile_image_url" name="profile_image_url" 
+                                               value="{{ current_user.profile_image_url if current_user.profile_image_url and current_user.profile_image_url.startswith('http') else '' }}" 
+                                               placeholder="https://example.com/your-image.jpg"
+                                               class="w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base">
+                                        <p class="text-sm text-gray-500 mt-2">Enter a direct URL to an image</p>
+                                    </div>
+                                </div>
+
+                                <!-- Meeting Title -->
+                                <div>
+                                    <label for="meeting_title" class="block text-base font-medium text-gray-700 mb-3">Meeting Title</label>
+                                    <input type="text" id="meeting_title" name="meeting_title" 
+                                           value="{{ current_user.meeting_title or '30 Minute Meeting' }}" 
+                                           placeholder="e.g., Coffee Chat, Consultation, Quick Call"
+                                           class="w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base">
+                                </div>
+
+                                <!-- Meeting Description -->
+                                <div>
+                                    <label for="meeting_description" class="block text-base font-medium text-gray-700 mb-3">Meeting Description</label>
+                                    <textarea id="meeting_description" name="meeting_description" rows="4"
+                                              placeholder="Tell visitors what to expect from this meeting..."
+                                              class="w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base">{{ current_user.meeting_description or 'Let\'s get you booked! Follow the instructions and our assistant will add your event to the calendar' }}</textarea>
+                                    <p class="text-sm text-gray-500 mt-2">You can use HTML tags like &lt;br&gt; for line breaks</p>
+                                </div>
+
+                                <!-- Meeting Duration -->
+                                <div>
+                                    <label for="meeting_duration" class="block text-base font-medium text-gray-700 mb-3">Meeting Duration (minutes)</label>
+                                    <input type="number" id="meeting_duration" name="meeting_duration" 
+                                           value="{{ current_user.meeting_duration or 30 }}" 
+                                           min="15" max="480" step="15"
+                                           class="w-full px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base">
+                                    <p class="text-sm text-gray-500 mt-2">Duration between 15 minutes and 8 hours</p>
+                                </div>
+
+                                <!-- Theme Colors -->
+                                <div class="grid grid-cols-2 gap-6">
+                                    <div>
+                                        <label for="theme_color" class="block text-base font-medium text-gray-700 mb-3">Primary Color</label>
+                                        <input type="color" id="theme_color" name="theme_color" 
+                                               value="{{ current_user.theme_color or '#1e3c72' }}"
+                                               class="w-full h-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                        <p class="text-sm text-gray-500 mt-2">Main background color</p>
+                                    </div>
+                                    <div>
+                                        <label for="accent_color" class="block text-base font-medium text-gray-700 mb-3">Accent Color</label>
+                                        <input type="color" id="accent_color" name="accent_color" 
+                                               value="{{ current_user.accent_color or '#2a5298' }}"
+                                               class="w-full h-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                        <p class="text-sm text-gray-500 mt-2">Secondary background color</p>
+                                    </div>
+                                </div>
+
+                                <!-- Preview -->
+                                <div>
+                                    <label class="block text-base font-medium text-gray-700 mb-3">Preview</label>
+                                    <div class="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                                        <div class="flex items-center space-x-4">
+                                            <div class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-lg">
+                                                {{ current_user.full_name.split()[0][:1].upper() + current_user.full_name.split()[-1][:1].upper() if current_user.full_name.split()|length > 1 else current_user.full_name[:2].upper() }}
+                                            </div>
+                                            <div>
+                                                <h3 class="font-semibold text-lg" id="preview-title">{{ current_user.meeting_title or '30 Minute Meeting' }}</h3>
+                                                <p class="text-gray-600" id="preview-duration">⏰ {{ current_user.meeting_duration or 30 }} min</p>
+                                                <p class="text-sm text-gray-500 mt-1" id="preview-description">{{ current_user.meeting_description or 'Let\'s get you booked! Follow the instructions and our assistant will add your event to the calendar' }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="personalization-message"></div>
+
+                                <button type="submit" class="w-full text-white py-2 px-3 rounded-lg transition-colors text-base font-medium" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);" onmouseover="this.style.background='linear-gradient(135deg, #2a5298 0%, #1e3c72 100%)'" onmouseout="this.style.background='linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)'">
+                                    Save Personalization Settings
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
                 </div>
             </div>
         </main>
@@ -325,7 +497,12 @@ function showSection(sectionName) {
     
     // Remove active class from all nav buttons
     document.querySelectorAll('.settings-nav-btn').forEach(btn => {
+<<<<<<< HEAD
         btn.classList.remove('bg-blue-600', 'text-white');
+=======
+        btn.style.background = '';
+        btn.style.color = '';
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
         btn.classList.add('text-gray-600');
     });
     
@@ -333,8 +510,15 @@ function showSection(sectionName) {
     document.getElementById(sectionName + '-section').classList.remove('hidden');
     
     // Add active class to selected nav button
+<<<<<<< HEAD
     document.querySelector(`[data-section="${sectionName}"]`).classList.add('bg-blue-600', 'text-white');
     document.querySelector(`[data-section="${sectionName}"]`).classList.remove('text-gray-600');
+=======
+    const activeBtn = document.querySelector(`[data-section="${sectionName}"]`);
+    activeBtn.style.background = 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)';
+    activeBtn.style.color = 'white';
+    activeBtn.classList.remove('text-gray-600');
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
 }
 
 // Initialize with profile section active
@@ -357,11 +541,14 @@ function updateBookingUrl() {
 }
 
 // Calendar functions
+<<<<<<< HEAD
 function syncCalendar() {
     // Implementation for calendar sync
     console.log('Syncing calendar...');
 }
 
+=======
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
 function disconnectCalendar() {
     if (confirm('Are you sure you want to disconnect your Google Calendar? This will disable public booking.')) {
         fetch('/settings/api/disconnect-calendar', {
@@ -386,6 +573,13 @@ function disconnectCalendar() {
     }
 }
 
+<<<<<<< HEAD
+=======
+
+
+
+
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
 // Security functions
 function exportData() {
     // Implementation for data export
@@ -399,6 +593,87 @@ function deleteAccount() {
     }
 }
 
+<<<<<<< HEAD
+=======
+// File upload functions
+function uploadProfileImage() {
+    const fileInput = document.getElementById('profile_image_file');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Please select a file to upload.');
+        return;
+    }
+    
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+        alert('Please select a valid image file (JPG, PNG, GIF, or WebP).');
+        return;
+    }
+    
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB.');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    fetch('/settings/api/upload-profile-image', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.text())
+    .then(html => {
+        // Show success message
+        const messageDiv = document.getElementById('personalization-message');
+        messageDiv.innerHTML = html;
+        
+        // Reload page to show new image
+        setTimeout(() => {
+            window.location.reload();
+        }, 1500);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to upload image. Please try again.');
+    });
+}
+
+function removeProfileImage() {
+    if (confirm('Are you sure you want to remove your profile image?')) {
+        // Clear the profile image URL
+        document.getElementById('profile_image_url').value = '';
+        
+        // Submit the form to update the profile
+        const form = document.querySelector('form[hx-post="/settings/api/personalization"]');
+        const formData = new FormData(form);
+        formData.append('profile_image_url', '');
+        
+        fetch('/settings/api/personalization', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.text())
+        .then(html => {
+            const messageDiv = document.getElementById('personalization-message');
+            messageDiv.innerHTML = html;
+            
+            // Reload page to show changes
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to remove image. Please try again.');
+        });
+    }
+}
+
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
 // Update booking URL when slug changes
 document.getElementById('scheduling_slug').addEventListener('input', updateBookingUrl);
 </script>

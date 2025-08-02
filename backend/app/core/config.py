@@ -1,32 +1,47 @@
 import os
-from pydantic_settings import BaseSettings
 from typing import Optional
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     # Database
-    DATABASE_URL: str
+    DATABASE_URL: str = "sqlite:///./appointment_agent.db"
     
     # Security
-    SECRET_KEY: str
+    SECRET_KEY: str = "your-secret-key-here"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
-    # Google OAuth
-    GOOGLE_CLIENT_ID: Optional[str] = None
-    GOOGLE_CLIENT_SECRET: Optional[str] = None
-    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
+    # API
+    API_V1_STR: str = "/api/v1"
     
     # App settings
     PROJECT_NAME: str = "Appointment Agent"
-    APP_NAME: str = "Appointment Agent"
-    API_V1_STR: str = "/api/v1"
-    DEBUG: bool = False
+    DEBUG: bool = True
+    
+    # Frontend URL
+    FRONTEND_URL: str = "http://localhost:8000"
+    
+    # Google OAuth
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/auth/google/callback"
     
     # Email settings
     SMTP_SERVER: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USERNAME: str = ""
     SMTP_PASSWORD: str = ""
-    FRONTEND_URL: str = "http://localhost:8000"
+    
+    # LLM settings
+    LLM_PROVIDER: str = "openai"
+    OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
+    
+    # File upload settings
+    UPLOAD_DIR: str = "uploads"
+    MAX_FILE_SIZE: int = 5 * 1024 * 1024  # 5MB
+    ALLOWED_IMAGE_TYPES: list = ["image/jpeg", "image/png", "image/gif", "image/webp"]
     
     # LLM settings
     LLM_PROVIDER: str = "openai"  # "openai" or "claude"
@@ -35,10 +50,6 @@ class Settings(BaseSettings):
     
     class Config:
         env_file = ".env"
-        case_sensitive = False
 
-# Create settings instance
+
 settings = Settings()
-
-# Debug: Print loaded values (remove this after testing)
-print(f"Loaded GOOGLE_REDIRECT_URI: {settings.GOOGLE_REDIRECT_URI}")

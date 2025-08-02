@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 #!/usr/bin/env python3
 """
 Script to create test availability slots for testing the booking system.
@@ -83,3 +84,6 @@ async def create_test_slots():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(create_test_slots()) 
+=======
+ 
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840

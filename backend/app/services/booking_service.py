@@ -53,7 +53,11 @@ def create_booking(
             if booking_data.guest_message:
                 event_description += f"\nMessage: {booking_data.guest_message}"
             
+<<<<<<< HEAD
             created_event = calendar_service.create_event(
+=======
+            created_event = calendar_service.create_booking_event(
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
                 title=event_title,
                 start_time=slot.start_time,
                 end_time=slot.end_time,
@@ -84,7 +88,13 @@ def create_booking(
             guest_name=booking_data.guest_name,
             host_email=host_user.email,
             host_name=host_user.full_name,
+<<<<<<< HEAD
             booking=db_booking
+=======
+            booking=db_booking,
+            host_access_token=host_user.google_access_token,
+            host_refresh_token=host_user.google_refresh_token
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
         )
     except Exception as e:
         print(f"Failed to send confirmation email: {e}")
@@ -116,19 +126,36 @@ def update_booking(
     db: Session, 
     booking_id: int, 
     booking_update: BookingUpdate, 
+<<<<<<< HEAD
     user_id: int
+=======
+    user_id: int,
+    update_calendar: bool = True
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
 ) -> Optional[Booking]:
     """Update a booking."""
     booking = get_booking(db, booking_id, user_id)
     if not booking:
         return None
     
+<<<<<<< HEAD
+=======
+    # Store original times for calendar update
+    original_start_time = booking.start_time
+    original_end_time = booking.end_time
+    
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
     update_data = booking_update.dict(exclude_unset=True)
     for key, value in update_data.items():
         setattr(booking, key, value)
     
+<<<<<<< HEAD
     # If status is being changed to cancelled, try to delete the Google Calendar event
     if update_data.get('status') == 'cancelled' and booking.google_event_id:
+=======
+    # Handle Google Calendar updates only if requested
+    if update_calendar and booking.google_event_id:
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
         try:
             host = db.query(User).filter(User.id == booking.host_user_id).first()
             if host and host.google_access_token and host.google_refresh_token:
@@ -136,9 +163,31 @@ def update_booking(
                     access_token=host.google_access_token,
                     refresh_token=host.google_refresh_token
                 )
+<<<<<<< HEAD
                 calendar_service.delete_event(booking.google_event_id)
         except Exception as e:
             print(f"Failed to delete Google Calendar event: {e}")
+=======
+                
+                # If status is being changed to cancelled, delete the event
+                if update_data.get('status') == 'cancelled':
+                    calendar_service.delete_event(booking.google_event_id)
+                    print(f"Deleted Google Calendar event: {booking.google_event_id}")
+                
+                # If times are being updated, update the event
+                elif (update_data.get('start_time') and update_data.get('end_time') and 
+                      (booking.start_time != original_start_time or booking.end_time != original_end_time)):
+                    calendar_service.update_event(
+                        event_id=booking.google_event_id,
+                        start_time=booking.start_time,
+                        end_time=booking.end_time
+                    )
+                    print(f"Updated Google Calendar event: {booking.google_event_id}")
+                    
+        except Exception as e:
+            print(f"Failed to update Google Calendar event: {e}")
+            # Continue with booking update even if calendar update fails
+>>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
     
     db.commit()
     db.refresh(booking)
