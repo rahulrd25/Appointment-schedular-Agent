@@ -37,3 +37,83 @@ build/
 
 # uv cache
 .uv/
+
+# SECRETS AND CREDENTIALS - NEVER COMMIT THESE
+# Google OAuth
+client_secret.json
+credentials.json
+token.json
+*.json.key
+google_credentials.json
+
+# API Keys and Secrets
+*.pem
+*.key
+*.p12
+*.pfx
+api_keys.json
+secrets.json
+config.json
+
+# Database credentials
+database.json
+db_config.json
+connection.json
+
+# OAuth tokens
+oauth_tokens.json
+access_tokens.json
+refresh_tokens.json
+
+# Certificate files
+*.crt
+*.cert
+*.pem
+*.p12
+*.pfx
+
+# Backup files that might contain secrets
+*.bak
+*.backup
+*_backup.json
+*_old.json
+
+# Local configuration files
+local_config.json
+local_settings.json
+dev_config.json
+prod_config.json
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Log files that might contain sensitive data
+logs/
+*.log
+debug.log
+error.log
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache directories
+.cache/
+cache/
+__pycache__/
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini
