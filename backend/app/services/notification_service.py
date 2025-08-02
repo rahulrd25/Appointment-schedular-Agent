@@ -136,15 +136,15 @@ class NotificationService:
             try:
                 gmail_service = GmailService(host_access_token, host_refresh_token)
                 
-                # Send confirmation to guest
-                guest_sent = gmail_service.send_booking_confirmation(
-                    guest_email, guest_name, host_name, booking
+                # Send to guest
+                guest_sent = gmail_service.send_booking_confirmation_notification(
+                    guest_email, guest_name, host_name, booking, is_host=False
                 )
                 results["guest_email_sent"] = guest_sent
                 
-                # Send notification to host
-                host_sent = gmail_service.send_booking_notification(
-                    host_email, host_name, guest_name, guest_email, booking
+                # Send to host
+                host_sent = gmail_service.send_booking_confirmation_notification(
+                    host_email, host_name, host_name, booking, is_host=True
                 )
                 results["host_email_sent"] = host_sent
                 

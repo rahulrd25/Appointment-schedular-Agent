@@ -65,9 +65,10 @@ class BackgroundSyncService:
         Perform one sync cycle.
         
         This method:
-        1. Finds bookings that need sync
-        2. Attempts to sync them to calendar providers
-        3. Updates sync status and metadata
+        1. Syncs calendar events to database (Calendar → DB)
+        2. Finds bookings that need sync to calendar (DB → Calendar)
+        3. Attempts to sync them to calendar providers
+        4. Updates sync status and metadata
         """
         try:
             logger.debug("Starting sync cycle")
@@ -75,23 +76,64 @@ class BackgroundSyncService:
             # Get database session
             db = next(get_db())
             
-            # Find bookings that need sync
+            # Step 1: Sync calendar events to database (Calendar → DB)
+            await self._perform_calendar_to_database_sync(db)
+            
+            # Step 2: Find bookings that need sync to calendar (DB → Calendar)
             bookings_to_sync = self._find_bookings_needing_sync(db)
             
             if not bookings_to_sync:
-                logger.debug("No bookings need sync in this cycle")
-                return
-            
-            logger.info(f"Found {len(bookings_to_sync)} bookings that need sync")
-            
-            # Process each booking
-            for booking in bookings_to_sync:
-                await self._sync_single_booking(db, booking)
+                logger.debug("No bookings need sync to calendar in this cycle")
+            else:
+                logger.info(f"Found {len(bookings_to_sync)} bookings that need sync to calendar")
+                
+                # Process each booking
+                for booking in bookings_to_sync:
+                    await self._sync_single_booking(db, booking)
             
             logger.debug("Completed sync cycle")
             
         except Exception as e:
             logger.error(f"Failed to perform sync cycle: {str(e)}")
+    
+    async def _perform_calendar_to_database_sync(self, db: Session) -> None:
+        """
+        Perform calendar to database sync for all connected users.
+        
+        This method:
+        1. Finds all users with connected calendars
+        2. Syncs their calendar events to database
+        3. Creates/updates bookings from calendar events
+        """
+        try:
+            logger.debug("Starting calendar to database sync cycle")
+            
+            # Find all users with connected calendars
+            users_with_calendar = db.query(User).filter(
+                User.google_calendar_connected == True,
+                User.google_access_token.isnot(None),
+                User.google_refresh_token.isnot(None)
+            ).all()
+            
+            if not users_with_calendar:
+                logger.debug("No users with connected calendars found")
+                return
+            
+            logger.info(f"Found {len(users_with_calendar)} users with connected calendars")
+            
+            # Sync calendar events for each user
+            for user in users_with_calendar:
+                try:
+                    logger.debug(f"Syncing calendar events for user {user.id} ({user.email})")
+                    await self.sync_calendar_to_database(db, user.id)
+                except Exception as e:
+                    logger.error(f"Failed to sync calendar for user {user.id}: {str(e)}")
+                    continue
+            
+            logger.debug("Completed calendar to database sync cycle")
+            
+        except Exception as e:
+            logger.error(f"Failed to perform calendar to database sync cycle: {str(e)}")
     
     def _find_bookings_needing_sync(self, db: Session) -> List[Booking]:
         """
@@ -276,29 +318,257 @@ class BackgroundSyncService:
     
     async def get_sync_status_summary(self) -> Dict[str, Any]:
         """
-        Get summary of sync status across all bookings.
+        Get a summary of sync status for all users.
         
         Returns:
-            Sync status summary
+            Dict containing sync status summary
         """
         try:
             db = next(get_db())
             
-            total_bookings = db.query(Booking).count()
-            synced_bookings = db.query(Booking).filter(Booking.google_event_id.isnot(None)).count()
-            failed_bookings = total_bookings - synced_bookings
+            # Get all users with calendar connections
+            users_with_calendar = db.query(User).filter(
+                User.google_access_token.isnot(None),
+                User.google_refresh_token.isnot(None)
+            ).all()
             
-            return {
-                "total_bookings": total_bookings,
-                "synced_bookings": synced_bookings,
-                "failed_bookings": failed_bookings,
-                "sync_percentage": (synced_bookings / total_bookings * 100) if total_bookings > 0 else 0,
-                "last_sync_check": datetime.utcnow().isoformat()
+            summary = {
+                "total_users_with_calendar": len(users_with_calendar),
+                "users_sync_status": []
             }
+            
+            for user in users_with_calendar:
+                user_bookings = db.query(Booking).filter(
+                    Booking.host_user_id == user.id
+                ).all()
+                
+                status_counts = {}
+                for booking in user_bookings:
+                    status = booking.sync_status or "pending"
+                    status_counts[status] = status_counts.get(status, 0) + 1
+                
+                summary["users_sync_status"].append({
+                    "user_id": user.id,
+                    "email": user.email,
+                    "total_bookings": len(user_bookings),
+                    "status_counts": status_counts
+                })
+            
+            return summary
             
         except Exception as e:
             logger.error(f"Failed to get sync status summary: {str(e)}")
             return {"error": str(e)}
+
+    async def sync_calendar_to_database(self, db: Session, user_id: int) -> Dict[str, Any]:
+        """
+        Pull calendar events and sync them to database.
+        This implements Calendar → Database sync following the architecture.
+        
+        Args:
+            db: Database session
+            user_id: User ID to sync calendar for
+            
+        Returns:
+            Dict containing sync results
+        """
+        try:
+            print(f"🔄 SYNC SERVICE: Starting calendar to database sync for user {user_id}")
+            logger.info(f"Starting calendar to database sync for user {user_id}")
+            
+            # Get user with calendar connection
+            print(f"👤 SYNC SERVICE: Getting user from database...")
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user or not user.google_access_token:
+                print(f"❌ SYNC SERVICE ERROR: User not found or calendar not connected")
+                return {
+                    "success": False,
+                    "error": "User not found or calendar not connected",
+                    "events_created": 0,
+                    "events_updated": 0
+                }
+            
+            print(f"✅ SYNC SERVICE: User found - {user.email}, Calendar connected: {user.google_calendar_connected}")
+            
+            # Initialize Google Calendar service
+            print(f"🔗 SYNC SERVICE: Initializing Google Calendar service...")
+            from app.services.google_calendar_service import GoogleCalendarService
+            calendar_service = GoogleCalendarService(
+                access_token=user.google_access_token,
+                refresh_token=user.google_refresh_token,
+                db=db,
+                user_id=user_id
+            )
+            
+            # Get events from Google Calendar (last 7 days to next 7 days - smaller range for faster sync)
+            from datetime import datetime, timedelta, timezone
+            start_date = datetime.now(timezone.utc) - timedelta(days=7)
+            end_date = datetime.now(timezone.utc) + timedelta(days=7)
+            
+            print(f"📅 SYNC SERVICE: Fetching events from {start_date} to {end_date}")
+            calendar_events = calendar_service.get_events(start_date, end_date)
+            print(f"📊 SYNC SERVICE: Found {len(calendar_events)} calendar events")
+            
+            # Process all events (no limit in production)
+            print(f"📊 SYNC SERVICE: Processing all {len(calendar_events)} calendar events")
+            
+            events_created = 0
+            events_updated = 0
+            
+            print(f"🔄 SYNC SERVICE: Processing {len(calendar_events)} events...")
+            for i, event in enumerate(calendar_events):
+                try:
+                    print(f"📝 SYNC SERVICE: Processing event {i+1}/{len(calendar_events)} - ID: {event.get('id')}, Title: {event.get('summary', 'No title')}")
+                    
+                    # Check if booking already exists for this calendar event
+                    existing_booking = db.query(Booking).filter(
+                        Booking.google_event_id == event.get('id'),
+                        Booking.host_user_id == user_id
+                    ).first()
+                    
+                    if existing_booking:
+                        print(f"🔄 SYNC SERVICE: Found existing booking {existing_booking.id} for event {event.get('id')}")
+                        # Update existing booking if event changed
+                        if self._has_event_changed(existing_booking, event):
+                            self._update_booking_from_calendar_event(existing_booking, event)
+                            events_updated += 1
+                            print(f"✅ SYNC SERVICE: Updated booking {existing_booking.id} from calendar event")
+                            logger.info(f"Updated booking {existing_booking.id} from calendar event")
+                        else:
+                            print(f"⏭️ SYNC SERVICE: Event unchanged, skipping update")
+                    else:
+                        print(f"⏭️ SYNC SERVICE: Skipping calendar event {event.get('id')} - Database-First approach")
+                        # Skip creating bookings from calendar events - Database-First approach
+                        # Only existing bookings should be synced, not new ones created from calendar
+                
+                except Exception as e:
+                    print(f"❌ SYNC SERVICE ERROR: Failed to process calendar event {event.get('id')}: {str(e)}")
+                    logger.error(f"Failed to process calendar event {event.get('id')}: {str(e)}")
+                    continue
+            
+            print(f"💾 SYNC SERVICE: Committing database changes...")
+            db.commit()
+            
+            print(f"✅ SYNC SERVICE: Calendar to database sync completed: {events_updated} updated, {len(calendar_events)} total processed (Database-First approach)")
+            logger.info(f"Calendar to database sync completed: {events_updated} updated (Database-First approach)")
+            
+            return {
+                "success": True,
+                "events_created": 0,  # No longer creating from calendar events
+                "events_updated": events_updated,
+                "total_events_processed": len(calendar_events)
+            }
+            
+        except Exception as e:
+            print(f"❌ SYNC SERVICE ERROR: Failed to sync calendar to database: {str(e)}")
+            logger.error(f"Failed to sync calendar to database: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "events_created": 0,
+                "events_updated": 0
+            }
+    
+    def _has_event_changed(self, booking: Booking, event: Dict[str, Any]) -> bool:
+        """Check if calendar event has changed compared to database booking."""
+        try:
+            start_data = event.get('start', {})
+            end_data = event.get('end', {})
+            
+            # Handle both dateTime and date formats
+            event_start = start_data.get('dateTime') or start_data.get('date')
+            event_end = end_data.get('dateTime') or end_data.get('date')
+            event_summary = event.get('summary', '')
+            event_description = event.get('description', '')
+            
+            if not event_start or not event_end:
+                return False
+            
+            from datetime import datetime
+            
+            # Determine event type and parse accordingly
+            is_all_day = 'date' in start_data
+            
+            if is_all_day:
+                # All-day event
+                event_start_dt = datetime.fromisoformat(event_start + 'T00:00:00+00:00')
+                event_end_dt = datetime.fromisoformat(event_end + 'T23:59:59+00:00')
+            else:
+                # Time-specific event
+                event_start_dt = datetime.fromisoformat(event_start.replace('Z', '+00:00'))
+                event_end_dt = datetime.fromisoformat(event_end.replace('Z', '+00:00'))
+            
+            # Compare times (with small tolerance for timezone differences)
+            time_diff = abs((event_start_dt - booking.start_time).total_seconds())
+            if time_diff > 60:  # 1 minute tolerance
+                return True
+            
+            time_diff = abs((event_end_dt - booking.end_time).total_seconds())
+            if time_diff > 60:  # 1 minute tolerance
+                return True
+            
+            # Compare other fields
+            if event_summary and booking.guest_name != event_summary:
+                return True
+            
+            if event_description != (booking.guest_message or ''):
+                return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error checking if event changed: {str(e)}")
+            return False
+    
+    def _update_booking_from_calendar_event(self, booking: Booking, event: Dict[str, Any]) -> None:
+        """Update existing booking from calendar event data."""
+        try:
+            start_data = event.get('start', {})
+            end_data = event.get('end', {})
+            
+            # Handle both dateTime and date formats
+            event_start = start_data.get('dateTime') or start_data.get('date')
+            event_end = end_data.get('dateTime') or end_data.get('date')
+            event_summary = event.get('summary', '')
+            event_description = event.get('description', '')
+            
+            from datetime import datetime
+            
+            if event_start:
+                # Determine if it's all-day or time-specific
+                is_all_day = 'date' in start_data
+                
+                if is_all_day:
+                    # All-day event
+                    booking.start_time = datetime.fromisoformat(event_start + 'T00:00:00+00:00')
+                else:
+                    # Time-specific event
+                    booking.start_time = datetime.fromisoformat(event_start.replace('Z', '+00:00'))
+            
+            if event_end:
+                # Determine if it's all-day or time-specific
+                is_all_day = 'date' in end_data
+                
+                if is_all_day:
+                    # All-day event (end date is exclusive)
+                    booking.end_time = datetime.fromisoformat(event_end + 'T23:59:59+00:00')
+                else:
+                    # Time-specific event
+                    booking.end_time = datetime.fromisoformat(event_end.replace('Z', '+00:00'))
+            
+            if event_summary:
+                booking.guest_name = event_summary
+            
+            if event_description:
+                booking.guest_message = event_description
+            
+            booking.sync_status = "synced"
+            booking.last_synced = datetime.utcnow()
+            
+        except Exception as e:
+            logger.error(f"Error updating booking from calendar event: {str(e)}")
+    
+
 
 
 # Global instance for background sync service

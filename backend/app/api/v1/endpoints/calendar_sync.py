@@ -26,7 +26,7 @@ from app.models.models import Booking
 
 # Initialize router with proper tags and prefix
 router = APIRouter(
-    prefix="/api/v1/calendar",
+    prefix="/calendar",
     tags=["Calendar Sync"],
     responses={
         404: {"model": ErrorResponse, "description": "Event not found"},
@@ -444,4 +444,54 @@ async def force_sync_all(
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to force sync: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to force sync: {str(e)}")
+
+
+@router.post("/sync/pull-from-calendar")
+async def pull_calendar_events_to_database(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_from_cookie)
+):
+    """
+    Pull calendar events from Google Calendar and sync them to database.
+    This implements Calendar → Database sync following the architecture.
+    
+    This endpoint:
+    1. Fetches events from Google Calendar
+    2. Creates database bookings for new events
+    3. Updates existing bookings for changed events
+    4. Returns sync results
+    """
+    try:
+        # Check if user has calendar connected
+        if not current_user.google_access_token or not current_user.google_refresh_token:
+            raise HTTPException(
+                status_code=400, 
+                detail="Google Calendar not connected. Please connect your calendar first."
+            )
+        
+        # Initialize background sync service
+        from app.services.sync.background_sync import BackgroundSyncService
+        sync_service = BackgroundSyncService()
+        
+        # Perform calendar to database sync
+        sync_result = await sync_service.sync_calendar_to_database(db, current_user.id)
+        
+        if not sync_result.get("success"):
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to sync calendar events: {sync_result.get('error', 'Unknown error')}"
+            )
+        
+        return {
+            "success": True,
+            "message": f"Successfully synced calendar events to database",
+            "events_created": sync_result.get("events_created", 0),
+            "events_updated": sync_result.get("events_updated", 0),
+            "total_events_processed": sync_result.get("total_events_processed", 0)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to pull calendar events: {str(e)}") 

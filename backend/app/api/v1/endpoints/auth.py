@@ -14,8 +14,7 @@ from app.core.database import get_db
 from app.core.security import create_access_token, verify_token
 from app.schemas.schemas import UserCreate
 from app.services.user_service import authenticate_user, create_user, get_user_by_email
-from app.core.timezone_utils import TimezoneManager
-from app.services.google_calendar_service import GoogleCalendarService
+from app.models.models import User
 
 router = APIRouter()
 
@@ -120,24 +119,29 @@ async def google_auth_callback(
             if "calendar" not in scope.lower():
                 return RedirectResponse(url="/dashboard?calendar_error=no_calendar_scope", status_code=302)
             
-            # Store calendar tokens temporarily with a unique identifier
-            connection_id = secrets.token_urlsafe(32)
+            # For calendar connection, we need to get the current logged-in user
+            # The user will be authenticated via cookie in the complete_calendar_connection endpoint
+            # So we'll just store the connection data and let the completion endpoint handle the user
             
-            # Store temporarily in a simple dict (in production, use Redis or database)
-            if not hasattr(router.state, 'pending_calendar_connections'):
-                router.state.pending_calendar_connections = {}
-            
-            router.state.pending_calendar_connections[connection_id] = {
-                'calendar_email': calendar_email,
-                'calendar_name': calendar_name,
-                'access_token': access_token,
-                'refresh_token': refresh_token,
-                'created_at': datetime.now(),
-                'scope': scope
-            }
-            
-            # Redirect to agent dashboard with connection ID
-            return RedirectResponse(url=f"/dashboard?calendar_connection_id={connection_id}", status_code=302)
+            # Store calendar connection in database
+            try:
+                from app.services.pending_connection_service import PendingConnectionService
+                
+                connection_id = PendingConnectionService.create_pending_connection(
+                    db=db,
+                    calendar_email=calendar_email,
+                    calendar_name=calendar_name,
+                    access_token=access_token,
+                    refresh_token=refresh_token,
+                    scope=scope
+                )
+                
+                # Redirect to agent dashboard with connection ID
+                redirect_url = f"/dashboard?calendar_connection_id={connection_id}"
+                return RedirectResponse(url=redirect_url, status_code=302)
+                
+            except Exception as e:
+                return RedirectResponse(url="/dashboard?calendar_error=storage_failed", status_code=302)
         
         else:
             # Regular signup flow
@@ -168,24 +172,6 @@ async def google_auth_callback(
                 user.google_refresh_token = refresh_token
             user.google_calendar_connected = True
             user.google_calendar_email = user.email
-            
-            # Auto-detect timezone from Google Calendar
-            try:
-                calendar_service = GoogleCalendarService(
-                    access_token=access_token,
-                    refresh_token=refresh_token,
-                    db=db,
-                    user_id=user.id
-                )
-                detected_timezone = TimezoneManager.detect_timezone_from_google_calendar(calendar_service)
-                user.timezone = detected_timezone
-                print(f"✅ Auto-detected timezone: {detected_timezone} for user {user.email}")
-            except Exception as e:
-                print(f"⚠️ Could not detect timezone for user {user.email}: {e}")
-                # Keep existing timezone or default to UTC
-                if not user.timezone:
-                    user.timezone = "UTC"
-            
             db.commit()
             
             # Create access token for our app
@@ -197,10 +183,9 @@ async def google_auth_callback(
                 key="access_token",
                 value=jwt_token,
                 httponly=True,
-                max_age=86400,  # 24 hours (1440 minutes * 60 seconds)
+                max_age=1800,
                 secure=False,
-                samesite="lax",
-                path="/"  # Make cookie available across all paths
+                samesite="lax"
             )
             return response
         
@@ -230,51 +215,54 @@ async def complete_calendar_connection(
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
         
-        # Get the pending calendar connection
-        if not hasattr(router.state, 'pending_calendar_connections'):
-            raise HTTPException(status_code=404, detail="Calendar connection not found")
+        # Get the pending calendar connection from database
+        from app.services.pending_connection_service import PendingConnectionService
         
-        connection_data = router.state.pending_calendar_connections.get(connection_id)
-        if not connection_data:
+        pending_connection = PendingConnectionService.get_pending_connection(db, connection_id)
+        if not pending_connection:
             raise HTTPException(status_code=404, detail="Calendar connection not found or expired")
         
-        # Update user with calendar credentials
-        user.google_access_token = connection_data['access_token']
-        user.google_refresh_token = connection_data['refresh_token']
-        user.google_calendar_connected = True
-        user.google_calendar_email = connection_data['calendar_email']
+        # Update the pending connection with the user_id
+        pending_connection.user_id = user.id
+        db.commit()
         
-        # Auto-detect timezone from Google Calendar
-        try:
-            calendar_service = GoogleCalendarService(
-                access_token=connection_data['access_token'],
-                refresh_token=connection_data['refresh_token'],
-                db=db,
-                user_id=user.id
-            )
-            detected_timezone = TimezoneManager.detect_timezone_from_google_calendar(calendar_service)
-            user.timezone = detected_timezone
-            print(f"✅ Auto-detected timezone: {detected_timezone} for user {user.email}")
-        except Exception as e:
-            print(f"⚠️ Could not detect timezone for user {user.email}: {e}")
-            # Keep existing timezone or default to UTC
-            if not user.timezone:
-                user.timezone = "UTC"
+        # Update user with calendar credentials
+        user.google_access_token = pending_connection.access_token
+        user.google_refresh_token = pending_connection.refresh_token
+        user.google_calendar_connected = True
+        user.google_calendar_email = pending_connection.calendar_email
         
         db.commit()
         
-        # Clean up the temporary connection data
-        del router.state.pending_calendar_connections[connection_id]
+        # Clean up the pending connection
+        PendingConnectionService.delete_pending_connection(db, connection_id)
         
-        # Auto-sync calendar availability
+        # Initialize calendar sync for the user
         try:
-            from app.services.availability_service import sync_calendar_availability
-            sync_calendar_availability(db, user)
-        except Exception:
-            # Don't fail the connection if sync fails
-            pass
+            from app.services.sync.background_sync import BackgroundSyncService
+            from app.core.calendar_architecture import CalendarSyncService, create_calendar_provider, CalendarProviderType
+            
+            # Create calendar sync service for the user
+            sync_service = CalendarSyncService(db, user.id)
+            
+            # Register Google Calendar provider
+            google_provider = create_calendar_provider(
+                CalendarProviderType.GOOGLE,
+                access_token=user.google_access_token,
+                refresh_token=user.google_refresh_token,
+                db=db,
+                user_id=user.id
+            )
+            sync_service.register_provider(google_provider)
+            
+            print(f"✅ Calendar sync initialized for user {user.email}")
+            
+        except Exception as e:
+            print(f"⚠️ Calendar sync initialization failed for {user.email}: {str(e)}")
+            # Don't fail the connection if sync initialization fails
         
-        return {"success": True, "calendar_email": connection_data['calendar_email']}
+        return {"success": True, "calendar_email": pending_connection.calendar_email}
         
     except Exception as e:
-        raise HTTPException(status_code=400, detail="Calendar connection failed")
+        print(f"❌ Calendar connection failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Calendar connection failed: {str(e)}")

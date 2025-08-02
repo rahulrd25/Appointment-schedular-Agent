@@ -22,7 +22,8 @@ class UserInDBBase(UserBase):
     google_id: Optional[str] = None
     scheduling_slug: Optional[str] = None
 
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True
 
 
 class User(UserInDBBase):
@@ -56,7 +57,8 @@ class AvailabilitySlot(AvailabilitySlotBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True
 
 
 # Booking Schemas
@@ -88,7 +90,8 @@ class Booking(BookingBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True
 
 
 # Response Schemas

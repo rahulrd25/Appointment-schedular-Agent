@@ -4,13 +4,10 @@ import json
 import logging
 from datetime import datetime
 
-from app.services.advanced_ai_agent_service import AdvancedAIAgentService, ExtractedInfo, AgentResponse
-from app.services.knowledge_base_service import KnowledgeBaseService
-from app.services.llm_provider import LLMService
-from app.services.llm_calendar_service import LLMCalendarService
+from .advanced_ai_agent_service import AdvancedAIAgentService, ExtractedInfo, AgentResponse, IntentType
+from .knowledge_base_service import KnowledgeBaseService
 from app.models.models import User, AvailabilitySlot, Booking
 from app.services import availability_service, booking_service, user_service
-from app.services.advanced_ai_agent_service import IntentType
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +22,18 @@ class IntelligentAgentService:
         self.ai_agent = AdvancedAIAgentService(db)
         self.knowledge_base = KnowledgeBaseService(db)
         
-        # Initialize LLM service with debug logging
+        # Initialize LLM service with OpenAI integration
         try:
-            self.llm_service = LLMService()  # Initialize LLM service
-            logger.info(f"LLM Service initialized successfully with provider: {self.llm_service.provider_name}")
+            from openai import OpenAI
+            from app.core.config import settings
+            
+            openai_api_key = settings.OPENAI_API_KEY
+            if openai_api_key and openai_api_key.strip():
+                self.llm_service = OpenAI(api_key=openai_api_key)
+                logger.info("✅ LLM Service initialized successfully with OpenAI")
+            else:
+                self.llm_service = None
+                logger.warning("⚠️ OpenAI API key not found, using rule-based mode only")
         except Exception as e:
             logger.error(f"Failed to initialize LLM service: {e}")
             logger.warning("AI agent will operate in rule-based mode only. Set OPENAI_API_KEY environment variable for LLM capabilities.")
@@ -48,15 +53,16 @@ class IntelligentAgentService:
             "proactive_suggestions": True,
             "conflict_resolution": True,
             "multi_step_reasoning": True,
-            "llm_enhanced": True,
+            "llm_enhanced": self.llm_service is not None,
             "calendar_integration": True
         }
     
     def _initialize_calendar_service(self, user_id: int):
         """Initialize calendar service for a specific user"""
         try:
-            self.calendar_service = LLMCalendarService(self.db, user_id)
-            logger.info(f"Calendar service initialized for user {user_id}")
+            # For now, we'll use the existing calendar functionality
+            # Calendar service will be initialized when needed
+            logger.info(f"Calendar service will be initialized for user {user_id} when needed")
         except Exception as e:
             logger.error(f"Failed to initialize calendar service for user {user_id}: {e}")
             self.calendar_service = None
@@ -103,27 +109,53 @@ class IntelligentAgentService:
             context["user_preferences"] = self._get_user_preferences(user_id)
             context["user_patterns"] = self.knowledge_base.get_user_patterns(user_id)
             
-            # Step 1: Advanced NLP Analysis (with LLM enhancement)
+            # Step 1: Advanced NLP Analysis (Rule-based)
             extracted_info = self.ai_agent._analyze_message(message, context)
             
-            # Step 1.5: LLM Intent Analysis (ENABLED with better integration)
+            # Step 2: LLM Analysis (Alternative/Enhanced)
+            llm_analysis = None
+            analysis_method = "rule_based"
             if self.llm_service:
                 try:
-                    logger.info("Attempting LLM intent analysis...")
-                    llm_intent_analysis = await self.llm_service.analyze_intent(message, context)
-                    logger.info(f"LLM intent analysis successful: {llm_intent_analysis}")
-                    # Merge LLM analysis with rule-based analysis (but prioritize our logic)
-                    extracted_info = self._merge_intent_analysis(extracted_info, llm_intent_analysis)
+                    logger.info("Attempting LLM analysis...")
+                    llm_analysis = await self._analyze_with_llm(message, context)
+                    if llm_analysis:
+                        logger.info(f"LLM analysis successful: {llm_analysis}")
+                        # Merge LLM analysis with rule-based analysis
+                        extracted_info = self._merge_intent_analysis(extracted_info, llm_analysis)
+                        analysis_method = "hybrid"
+                    else:
+                        logger.warning("LLM analysis returned None, using rule-based only")
                 except Exception as e:
                     logger.warning(f"LLM analysis failed, using rule-based only: {e}")
-                    # Continue with rule-based analysis only
             else:
-                logger.warning("LLM service not available, using rule-based analysis only")
+                logger.info("LLM service not available, using rule-based analysis only")
             
             # Step 2: Retrieve relevant knowledge
             relevant_knowledge = self.knowledge_base.get_relevant_knowledge(
-                message, user_id, context
+                user_id=user_id,
+                extracted_info=extracted_info,
+                context=context
             )
+            
+            # Step 2.5: Get relevant Q&A from knowledge base
+            relevant_qa = self.knowledge_base.get_relevant_qa(
+                message=message,
+                intent=extracted_info.intent.value if extracted_info.intent else None
+            )
+            
+            # Step 2.6: Find similar questions if user seems to be asking for help
+            similar_questions = []
+            if any(word in message.lower() for word in ["how", "what", "why", "help", "?"]):
+                similar_questions = self.knowledge_base.find_similar_questions(message)
+            
+            # Step 2.7: Get best practices for the current intent
+            best_practices = self.knowledge_base.get_best_practices()
+            relevant_best_practices = []
+            if extracted_info.intent == IntentType.SCHEDULE_MEETING:
+                relevant_best_practices = best_practices.get("meeting_duration", []) + best_practices.get("timing_tips", [])
+            elif extracted_info.intent == IntentType.CHECK_AVAILABILITY:
+                relevant_best_practices = best_practices.get("calendar_management", [])
             
             # Step 3: Get user patterns for personalization
             user_patterns = self.knowledge_base.get_user_patterns(user_id)
@@ -133,18 +165,17 @@ class IntelligentAgentService:
                 context, relevant_knowledge, user_patterns, extracted_info
             )
             
-            # Step 3: Generate intelligent response (ENABLED with better integration)
-            if self.llm_service and extracted_info.confidence > 0.3:
-                try:
-                    response = await self._generate_intelligent_response(
-                        extracted_info, enhanced_context, relevant_knowledge, user_patterns, message
-                    )
-                except Exception as e:
-                    logger.warning(f"LLM response generation failed, using agent logic: {e}")
-                    response = self.ai_agent._generate_response(extracted_info, context)
-            else:
-                # Use our agent logic for low confidence or when LLM is not available
-                response = self.ai_agent._generate_response(extracted_info, context)
+            # Step 4: Generate intelligent response
+            response = await self._generate_intelligent_response(
+                extracted_info=extracted_info,
+                context=context,
+                knowledge=relevant_knowledge,
+                patterns=user_patterns,
+                user_message=message,
+                relevant_qa=relevant_qa,
+                similar_questions=similar_questions,
+                best_practices=relevant_best_practices
+            )
             
             # Step 6: Learn from this interaction
             conversation_data = {
@@ -158,7 +189,7 @@ class IntelligentAgentService:
                 }],
                 "extracted_info": extracted_info,
                 "response": response,
-                "llm_provider": self.llm_service.provider_name if self.llm_service else "rule-based",
+                "llm_provider": "openai" if self.llm_service else "rule-based",
                 "entities": extracted_info.entities,
                 "sentiment": extracted_info.sentiment,
                 "urgency": extracted_info.urgency,
@@ -208,7 +239,8 @@ class IntelligentAgentService:
                 "context_id": context_id,
                 "knowledge_used": [k.id for k in relevant_knowledge],
                 "personalization_level": self._calculate_personalization_level(user_patterns),
-                "learning_insights": self._generate_learning_insights(conversation_data)
+                "learning_insights": self._generate_learning_insights(conversation_data),
+                "analysis_method": analysis_method
             }
             
         except Exception as e:
@@ -223,7 +255,8 @@ class IntelligentAgentService:
                 "context_id": context_id,
                 "knowledge_used": [],
                 "personalization_level": "basic",
-                "learning_insights": []
+                "learning_insights": [],
+                "analysis_method": "rule_based"
             }
     
     def _enhance_context_with_knowledge(
@@ -262,39 +295,207 @@ class IntelligentAgentService:
         context: Dict, 
         knowledge: List, 
         patterns: List,
-        user_message: str
+        user_message: str,
+        relevant_qa: List,
+        similar_questions: List,
+        best_practices: List
     ) -> AgentResponse:
         """
-        Generate intelligent response using LLM with our context logic
+        Generate intelligent response using knowledge base and best practices
         """
         try:
-            # Use our context analysis to determine what to do
-            context_info = extracted_info.context
+            # Check for casual greetings and non-scheduling messages
+            casual_greetings = ["hey", "hi", "hello", "good morning", "good afternoon", "good evening"]
+            if user_message.lower().strip() in casual_greetings:
+                return AgentResponse(
+                    message="Hey! 👋 I'm your scheduling assistant. How can I help you today?",
+                    action_taken="greeting",
+                    suggestions=[
+                        "Schedule a meeting",
+                        "Check my availability",
+                        "What can you do?"
+                    ],
+                    data={},
+                    confidence=0.9,
+                    requires_confirmation=False
+                )
             
-            # If we have complete information for scheduling, use our logic
-            if extracted_info.intent == IntentType.SCHEDULE_MEETING and context_info.get("can_schedule", False):
-                return self.ai_agent._handle_schedule_meeting(extracted_info, context)
+            # Check if this is a help/question request
+            if any(word in user_message.lower() for word in ["how", "what", "why", "help", "?"]):
+                return self._generate_help_response(
+                    user_message, relevant_qa, similar_questions, best_practices
+                )
             
-            # If we have missing information, ask for it using our logic
-            if extracted_info.intent == IntentType.SCHEDULE_MEETING and context_info.get("missing_info"):
-                return self.ai_agent._ask_for_missing_info(extracted_info, context, context_info["missing_info"])
+            # Use knowledge base Q&A if available for the current intent
+            if relevant_qa:
+                return self._generate_qa_enhanced_response(
+                    extracted_info, context, relevant_qa, best_practices
+                )
             
-            # For other cases, use LLM with enhanced context
-            enhanced_prompt = self._create_enhanced_prompt(extracted_info, context, knowledge, patterns, user_message)
+            # Check if this is a scheduling-related message
+            if extracted_info.intent and extracted_info.intent.value in ["schedule_meeting", "check_availability", "reschedule", "cancel"]:
+                return self._generate_scheduling_response(extracted_info, context, relevant_qa)
             
-            if self.llm_service:
-                llm_response = await self.llm_service.generate_response(enhanced_prompt)
-                
-                # Parse LLM response and create AgentResponse
-                return self._parse_llm_response(llm_response, extracted_info, context)
-            else:
-                # Fallback to our agent logic
-                return self.ai_agent._generate_response(extracted_info, context)
-                
+            # For general queries, provide helpful guidance
+            return AgentResponse(
+                message="I'm here to help with your scheduling needs! You can ask me to schedule meetings, check your availability, reschedule appointments, or cancel bookings. What would you like to do?",
+                action_taken="general_guidance",
+                suggestions=[
+                    "Schedule a meeting",
+                    "Check my availability",
+                    "What can you do?",
+                    "Help me with scheduling"
+                ],
+                data={},
+                confidence=0.8,
+                requires_confirmation=False
+            )
+            
         except Exception as e:
-            logger.error(f"Error in intelligent response generation: {e}")
-            # Fallback to our agent logic
-            return self.ai_agent._generate_response(extracted_info, context)
+            logger.error(f"Error generating intelligent response: {e}")
+            return AgentResponse(
+                message="I'm here to help with your scheduling needs! How can I assist you today?",
+                action_taken="error_fallback",
+                suggestions=["Schedule a meeting", "Check availability", "Get help"],
+                data={},
+                confidence=0.5,
+                requires_confirmation=False
+            )
+    
+    def _generate_scheduling_response(self, extracted_info: ExtractedInfo, context: Dict, relevant_qa: List) -> AgentResponse:
+        """Generate response for scheduling-related intents"""
+        
+        if relevant_qa:
+            qa = relevant_qa[0]
+            return AgentResponse(
+                message=qa["answer"],
+                action_taken=extracted_info.intent.value if extracted_info.intent else "scheduling_action",
+                suggestions=[
+                    "Schedule a meeting",
+                    "Check my availability",
+                    "Reschedule an appointment",
+                    "Cancel a meeting"
+                ],
+                data={"qa_used": qa},
+                confidence=0.9,
+                requires_confirmation=False
+            )
+        
+        # Default scheduling response
+        intent_messages = {
+            "schedule_meeting": "I can help you schedule a meeting! Just tell me who you want to meet with and when.",
+            "check_availability": "I can check your availability! What time period are you looking for?",
+            "reschedule": "I can help you reschedule! Which meeting would you like to move?",
+            "cancel": "I can help you cancel a meeting! Which one would you like to cancel?"
+        }
+        
+        message = intent_messages.get(extracted_info.intent.value, "I can help with your scheduling needs!")
+        
+        return AgentResponse(
+            message=message,
+            action_taken=extracted_info.intent.value if extracted_info.intent else "scheduling_action",
+            suggestions=[
+                "Schedule a meeting",
+                "Check my availability",
+                "Reschedule an appointment",
+                "Cancel a meeting"
+            ],
+            data={},
+            confidence=0.8,
+            requires_confirmation=False
+        )
+    
+    def _generate_help_response(
+        self, 
+        user_message: str, 
+        relevant_qa: List, 
+        similar_questions: List, 
+        best_practices: List
+    ) -> AgentResponse:
+        """Generate a helpful response based on knowledge base"""
+        
+        # If we have relevant Q&A, use it
+        if relevant_qa:
+            qa = relevant_qa[0]  # Use the most relevant
+            return AgentResponse(
+                message=qa["answer"],
+                action_taken="help_provided",
+                suggestions=[
+                    "Schedule a meeting",
+                    "Check my availability", 
+                    "Reschedule an appointment",
+                    "Cancel a meeting"
+                ],
+                data={"qa_used": qa},
+                confidence=0.9,
+                requires_confirmation=False
+            )
+        
+        # If we have similar questions, suggest them
+        if similar_questions:
+            suggestions = [f"'{qa['question']}'" for qa in similar_questions[:2]]
+            return AgentResponse(
+                message=f"I can help you with scheduling! Here are some common questions: {', '.join(suggestions)}. What would you like to know?",
+                action_taken="suggestions_provided",
+                suggestions=[
+                    "How do I schedule a meeting?",
+                    "How do I check my availability?",
+                    "How do I reschedule a meeting?"
+                ],
+                data={"similar_questions": similar_questions},
+                confidence=0.7,
+                requires_confirmation=False
+            )
+        
+        # Default help response
+        return AgentResponse(
+            message="I'm here to help with your scheduling needs! I can help you schedule meetings, check availability, reschedule appointments, and more. What would you like to do?",
+            action_taken="general_help",
+            suggestions=[
+                "Schedule a meeting",
+                "Check my availability", 
+                "Reschedule an appointment",
+                "Cancel a meeting"
+            ],
+            data={},
+            confidence=0.8,
+            requires_confirmation=False
+        )
+    
+    def _generate_qa_enhanced_response(
+        self, 
+        extracted_info: ExtractedInfo, 
+        context: Dict, 
+        relevant_qa: List, 
+        best_practices: List
+    ) -> AgentResponse:
+        """Generate response enhanced with knowledge base Q&A"""
+        
+        # Get the most relevant Q&A
+        qa = relevant_qa[0]
+        
+        # Enhance the response with best practices
+        enhanced_message = qa["answer"]
+        if best_practices:
+            enhanced_message += f"\n\n💡 Best practices: {best_practices[0]}"
+        
+        return AgentResponse(
+            message=enhanced_message,
+            action_taken=extracted_info.intent.value,
+            suggestions=[
+                "Schedule a meeting",
+                "Check my availability", 
+                "Reschedule an appointment",
+                "Cancel a meeting"
+            ],
+            data={
+                "qa_used": qa,
+                "best_practices": best_practices,
+                "intent": extracted_info.intent.value
+            },
+            confidence=extracted_info.confidence,
+            requires_confirmation=False
+        )
     
     def _create_enhanced_prompt(self, extracted_info: ExtractedInfo, context: Dict, knowledge: List, patterns: List, user_message: str) -> str:
         """
@@ -651,16 +852,28 @@ Remember: Only ask for what's actually missing, never repeat questions, and alwa
         return preferences
     
     def get_agent_capabilities(self) -> Dict[str, Any]:
-        """
-        Get agent capabilities and status
-        """
+        """Get agent capabilities and current status"""
         return {
             "capabilities": self.agent_capabilities,
-            "knowledge_summary": self.knowledge_base.get_knowledge_summary(),
-            "total_conversations": len(self.conversation_contexts),
-            "learning_enabled": True,
-            "personalization_enabled": True
+            "llm_available": self.llm_service is not None,
+            "rule_based_available": True,
+            "current_mode": "hybrid" if self.llm_service else "rule_based",
+            "analysis_methods": {
+                "rule_based": True,
+                "llm_enhanced": self.llm_service is not None
+            }
         }
+    
+    def get_analysis_mode(self) -> str:
+        """Get current analysis mode"""
+        if self.llm_service:
+            return "hybrid"  # Both rule-based and LLM
+        else:
+            return "rule_based"  # Only rule-based
+    
+    def is_llm_available(self) -> bool:
+        """Check if LLM is available"""
+        return self.llm_service is not None
     
     def get_user_insights(self, user_id: int) -> Dict[str, Any]:
         """
@@ -848,3 +1061,84 @@ Remember: Only ask for what's actually missing, never repeat questions, and alwa
                 
         except Exception as e:
             logger.warning(f"Failed to update user patterns: {e}")
+    
+    async def _analyze_with_llm(self, message: str, context: Dict) -> Dict[str, Any]:
+        """Analyze message using LLM for enhanced understanding"""
+        if not self.llm_service:
+            return None
+            
+        try:
+            # Create a comprehensive prompt for the LLM
+            prompt = self._create_llm_prompt(message, context)
+            
+            # Call OpenAI API
+            response = self.llm_service.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """You are an intelligent scheduling assistant. Analyze the user's message and extract:
+1. Intent (schedule_meeting, check_availability, reschedule, cancel, general_query)
+2. Entities (people, dates, times, topics, duration)
+3. Sentiment (positive, negative, neutral)
+4. Urgency (high, medium, low)
+5. Confidence (0.0 to 1.0)
+
+Respond with a JSON object containing these fields."""
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=300,
+                temperature=0.3
+            )
+            
+            # Parse the response
+            llm_response = response.choices[0].message.content
+            try:
+                import json
+                analysis = json.loads(llm_response)
+                logger.info(f"LLM analysis successful: {analysis}")
+                return analysis
+            except json.JSONDecodeError:
+                logger.warning(f"LLM response not valid JSON: {llm_response}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"LLM analysis failed: {e}")
+            return None
+    
+    def _create_llm_prompt(self, message: str, context: Dict) -> str:
+        """Create a comprehensive prompt for LLM analysis"""
+        conversation_history = context.get("conversation_history", [])
+        user_preferences = context.get("user_preferences", {})
+        
+        # Format conversation history
+        history_text = ""
+        if conversation_history:
+            history_text = "Recent conversation:\n"
+            for msg in conversation_history[-3:]:  # Last 3 messages
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                history_text += f"{role}: {content}\n"
+        
+        # Format user preferences
+        preferences_text = ""
+        if user_preferences:
+            preferences_text = f"User preferences: {user_preferences}\n"
+        
+        prompt = f"""
+{history_text}
+{preferences_text}
+Current message: "{message}"
+
+Analyze this message and respond with JSON containing:
+- intent: the primary intent
+- entities: extracted entities (people, dates, times, topics)
+- sentiment: positive/negative/neutral
+- urgency: high/medium/low
+- confidence: 0.0-1.0
+"""
+        return prompt

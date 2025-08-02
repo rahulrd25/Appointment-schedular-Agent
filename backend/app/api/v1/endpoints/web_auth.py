@@ -19,42 +19,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.get("/login", response_class=HTMLResponse)
-async def login_get(request: Request):
-    """Render login page"""
-    return templates.TemplateResponse("login.html", {"request": request})
 
-
-@router.post("/login", response_class=HTMLResponse)
-async def login_post(
-    request: Request,
-    response: Response,
-    username: str = Form(...),
-    password: str = Form(...),
-    db: Session = Depends(get_db),
-):
-    """Handle login form submission"""
-    user = await authenticate_user(db, username, password)
-    if not user:
-        return HTMLResponse(
-            content='<div class="text-red-500">Invalid email or password.</div>',
-            status_code=status.HTTP_401_UNAUTHORIZED,
-        )
-    
-    access_token = create_access_token(data={"sub": user.email})
-    response = HTMLResponse(
-        content='<div class="text-green-500">Login successful! Redirecting...</div><script>setTimeout(()=>window.location.href="/dashboard", 1000);</script>'
-    )
-    response.set_cookie(
-        key="access_token",
-        value=f"Bearer {access_token}",
-        httponly=True,
-        secure=True,
-        samesite="lax",
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        path="/"
-    )
-    return response
 
 
 @router.get("/register", response_class=HTMLResponse)

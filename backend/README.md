@@ -1,127 +1,251 @@
 # Appointment Agent Backend
 
-Welcome to the backend of **Appointment Agent** – an AI-powered appointment scheduling system that makes booking and managing meetings effortless for both hosts and guests.
+A FastAPI-based backend for an intelligent appointment booking system with AI agent capabilities and calendar synchronization.
 
----
+## 🏗️ Architecture Overview
 
-## What is Appointment Agent?
+### Database-as-Source-of-Truth Architecture
 
-Appointment Agent is a modern scheduling platform that combines:
-- **AI-powered conversation** for natural, intelligent scheduling
-- **Google Calendar integration** for real-time availability and event management
-- **A clean, user-friendly interface** built with Jinja2 templates and Tailwind CSS
+This application follows a **Database-as-Source-of-Truth** architecture with bidirectional calendar synchronization:
 
-Whether you're a solo professional or a team, Appointment Agent helps you automate your scheduling, avoid double-bookings, and provide a seamless experience for your clients or guests.
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Database      │◄──►│   Application   │◄──►│  Google Calendar│
+│  (Source of     │    │   (FastAPI)     │    │   (External)    │
+│   Truth)        │    │                 │    │                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
 
----
+### Core Principles
 
-## Key Features
+1. **Database is the Single Source of Truth**
+   - All booking data is stored in the database first
+   - External calendars are synced TO the database
+   - Display endpoints show database data only
 
-### User Management & Authentication
-- Register and log in with email/password or Google OAuth
-- Email verification for new users
-- Profile management with customizable booking links
-- Timezone support for accurate scheduling
+2. **Bidirectional Sync**
+   - **DB → Calendar**: Background sync pushes database bookings to Google Calendar
+   - **Calendar → DB**: Manual/automatic sync pulls calendar events into database
 
-### AI Agent System
-- Natural language chat for scheduling and managing appointments
-- Understands requests like "Book a meeting next Friday at 2pm" or "Show my upcoming appointments"
-- Context-aware conversation and intent recognition
+3. **Modular Design**
+   - Separate routers for different functionalities
+   - Service layer for business logic
+   - Clean separation of concerns
 
-### Google Calendar Integration
-- Secure OAuth connection to your Google Calendar
-- Real-time sync: see your true availability, prevent double-booking
-- Automatic event creation, updates, and deletion
-- Handles token refresh and permission errors gracefully
+## 🔄 Sync Flow
 
-### Availability Management
-- Create single, recurring, or bulk availability slots
-- Use templates for business hours, mornings, afternoons, or custom times
-- All slots are synced with Google Calendar (if connected)
+### 1. Database → Calendar Sync (Automatic)
+```
+User creates booking → Database → Background Sync → Google Calendar
+```
 
-### Booking System
-- Shareable public booking pages for guests
-- Guests see only your real available times
-- Simple booking form (name, email, message)
-- Automatic Google Calendar event creation for each booking
+**Components:**
+- `BackgroundSyncService`: Periodic sync of database bookings to calendar
+- `CalendarSyncService`: Orchestrates sync to multiple providers
+- `EnhancedBookingService`: Integrates sync into booking operations
 
-### Booking Management
-- Dashboard to view upcoming bookings, stats, and calendar status
-- Cancel, reschedule, or email guests directly from the dashboard
-- Filter and search bookings by status, date, or guest
-- Email notifications for confirmations, cancellations, and reschedules
+### 2. Calendar → Database Sync (Manual/Automatic)
+```
+Google Calendar → Pull Events → Create/Update Database Bookings → Dashboard
+```
 
-### Advanced Features
-- Reschedule workflow with available slot selection
-- Host can send custom emails to guests
-- Automatic Google token refresh
-- Friendly error handling and user notifications
+**Components:**
+- `sync_calendar_to_database()`: Pulls calendar events into database
+- `/api/v1/calendar-sync/pull-from-calendar`: API endpoint to trigger sync
+- Webhook handlers: Real-time updates from calendar changes
 
----
+### 3. Real-time Updates
+```
+Calendar Changes → Webhooks → Update Database → Dashboard Updates
+```
 
-## Technical Overview
+**Components:**
+- `WebhookHandler`: Processes calendar webhooks
+- `/api/v1/webhooks/google-calendar`: Webhook endpoint
 
-- **Backend**: FastAPI, SQLAlchemy ORM, PostgreSQL
-- **Frontend**: Jinja2 templates, Tailwind CSS (no JavaScript required for time formatting)
-- **Authentication**: JWT (secure cookies), Google OAuth
-- **AI Services**: Pluggable (OpenAI, Claude, etc.)
-- **Email**: Gmail API for notifications
+## 📊 Data Flow
 
----
+### Dashboard Data Flow
+```
+Dashboard Request → Database Query → Return Database Data
+```
 
-## Development
+**Endpoints:**
+- `/dashboard/api/data`: Shows database bookings only
+- `/bookings/api/stats`: Shows database booking statistics
+- `/bookings/api/list`: Shows database booking list
 
-To set up the development environment:
+### Calendar Integration Flow
+```
+Calendar Connection → OAuth Flow → Store Tokens → Enable Sync
+```
 
-1.  **Install `uv`**: If you don't have `uv` installed, follow the instructions [here](https://github.com/astral-sh/uv).
+**Endpoints:**
+- `/api/v1/auth/google/calendar`: Initiate OAuth
+- `/api/v1/auth/calendar/connect`: Complete connection
+- `/api/v1/calendar-sync/pull-from-calendar`: Manual sync
 
-2.  **Install dependencies**: Navigate to the `backend` directory and run:
-    ```bash
-    uv pip install -r requirements.txt
-    ```
+## 🗂️ Project Structure
 
-3.  **Run the application**: 
-    ```bash
-    uv run python main.py
-    ```
+```
+backend/
+├── app/
+│   ├── api/v1/endpoints/          # API endpoints
+│   │   ├── calendar_sync.py       # Calendar sync endpoints
+│   │   ├── webhooks.py           # Webhook handlers
+│   │   └── ...
+│   ├── core/                      # Core architecture
+│   │   ├── calendar_architecture.py # Calendar provider interfaces
+│   │   ├── sync_config.py         # Sync configuration
+│   │   └── ...
+│   ├── routers/                   # Web page routers
+│   │   ├── dashboard.py          # Dashboard pages
+│   │   ├── bookings.py           # Booking pages
+│   │   └── ...
+│   ├── services/                  # Business logic
+│   │   ├── sync/                 # Sync services
+│   │   │   ├── background_sync.py # Background sync
+│   │   │   └── webhook_handler.py # Webhook processing
+│   │   ├── booking_service.py    # Booking operations
+│   │   └── ...
+│   └── models/                    # Database models
+├── main.py                        # Application entry point
+└── requirements.txt               # Dependencies
+```
 
-    The application will be available at `http://localhost:8000`.
+## 🚀 Getting Started
 
----
+### Prerequisites
+- Python 3.11+
+- PostgreSQL database
+- Google Calendar API credentials
 
-## Project Structure
+### Installation
 
--   `app/api/v1`: API endpoints for different resources (users, calendar, auth)
--   `app/core`: Core configurations, database settings, security utilities
--   `app/models`: Database models (using SQLAlchemy)
--   `app/schemas`: Pydantic schemas for request and response validation
--   `app/services`: Business logic and integrations (AI, Google Calendar, email, etc.)
--   `app/static`: Static files (CSS, images)
--   `app/templates`: Jinja2 templates for all pages
+1. **Clone and setup:**
+```bash
+cd backend
+uv sync
+```
 
----
+2. **Environment setup:**
+```bash
+cp .env.example .env
+# Edit .env with your database and Google OAuth credentials
+```
 
-## Database
+3. **Database setup:**
+```bash
+# Run migrations
+alembic upgrade head
+```
 
-The application uses PostgreSQL. Make sure you have a PostgreSQL instance running and configure the connection string in `app/core/config.py`.
+4. **Start the server:**
+```bash
+uv run main.py
+```
 
----
+## 🔧 Key Features
 
-## Frontend (Tailwind CSS)
+### Calendar Synchronization
+- **Bidirectional sync** between database and Google Calendar
+- **Background sync** for automatic database → calendar updates
+- **Manual sync** for calendar → database imports
+- **Webhook support** for real-time calendar updates
 
-This project uses Tailwind CSS for styling. To compile the CSS:
+### AI Agent Integration
+- **Intelligent booking assistance**
+- **Natural language processing**
+- **Context-aware responses**
 
-1.  **Install Node.js dependencies**: Make sure you have Node.js installed. Then, in the `backend` directory, run:
-    ```bash
-    npm install
-    ```
+### User Management
+- **JWT authentication**
+- **OAuth2 for Google Calendar**
+- **User profiles and preferences**
 
-2.  **Build Tailwind CSS**: To compile `input.css` into `output.css`:
-    ```bash
-    npm run css:build
-    ```
+## 📡 API Endpoints
 
-    For development with live reloading:
-    ```bash
-    npm run css:watch
-    ```
+### Calendar Sync
+- `POST /api/v1/calendar-sync/pull-from-calendar` - Pull calendar events to database
+- `POST /api/v1/calendar-sync/force-sync` - Force sync database to calendar
+- `GET /api/v1/calendar-sync/sync/status` - Get sync status
+
+### Webhooks
+- `POST /api/v1/webhooks/google-calendar` - Google Calendar webhook endpoint
+
+### Dashboard
+- `GET /dashboard` - Main dashboard page
+- `GET /dashboard/api/data` - Dashboard data (database only)
+
+### Bookings
+- `GET /bookings` - Bookings page
+- `GET /bookings/api/stats` - Booking statistics
+- `GET /bookings/api/list` - Booking list
+
+## 🔄 Sync Status
+
+The system tracks sync status for each booking:
+- **`pending`**: Not yet synced
+- **`synced`**: Successfully synced to calendar
+- **`failed`**: Sync failed, needs retry
+- **`conflict`**: Sync conflict detected
+
+## 🛠️ Development
+
+### Adding New Calendar Providers
+1. Implement `BaseCalendarProvider` interface
+2. Add provider type to `CalendarProviderType` enum
+3. Update `create_calendar_provider()` factory function
+
+### Adding New Sync Features
+1. Add methods to `BackgroundSyncService`
+2. Create API endpoints in `calendar_sync.py`
+3. Update webhook handlers if needed
+
+## 📝 Configuration
+
+### Sync Configuration (`app/core/sync_config.py`)
+- Background sync intervals
+- Enabled providers
+- Sync timeouts and retries
+
+### Environment Variables
+- `DATABASE_URL`: PostgreSQL connection string
+- `GOOGLE_CLIENT_ID`: Google OAuth client ID
+- `GOOGLE_CLIENT_SECRET`: Google OAuth client secret
+- `SECRET_KEY`: JWT signing key
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+1. **Calendar not connecting:**
+   - Check Google OAuth credentials in `.env`
+   - Verify `client_secret.json` exists
+   - Check OAuth redirect URI configuration
+
+2. **Sync not working:**
+   - Check user has valid Google tokens
+   - Verify calendar permissions
+   - Check sync logs in application logs
+
+3. **Dashboard showing no data:**
+   - Verify database has bookings
+   - Check if calendar sync pulled events
+   - Ensure user is authenticated
+
+### Debug Commands
+```bash
+# Check sync status
+curl -X GET "http://localhost:8000/api/v1/calendar-sync/sync/status"
+
+# Manual calendar sync
+curl -X POST "http://localhost:8000/api/v1/calendar-sync/pull-from-calendar"
+
+# Force database sync
+curl -X POST "http://localhost:8000/api/v1/calendar-sync/force-sync"
+```
+
+## 📄 License
+
+This project is licensed under the MIT License.

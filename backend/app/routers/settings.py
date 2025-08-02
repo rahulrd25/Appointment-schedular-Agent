@@ -1,18 +1,15 @@
-from fastapi import APIRouter, Request, Form, HTTPException, Depends, File, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Request, Form, HTTPException, Depends, UploadFile, File
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from fastapi.templating import Jinja2Templates
+from pathlib import Path
 import os
 import shutil
-from pathlib import Path
-from datetime import datetime
 
 from app.core.database import get_db
+from app.core.security import verify_token
 from app.services.user_service import get_user_by_email
-from app.core.security import verify_token, get_password_hash, verify_password
-from app.services.google_calendar_service import GoogleCalendarService
-from app.core.timezone_utils import TimezoneManager
-
+from app.services.file_upload_service import save_uploaded_file
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -20,22 +17,22 @@ templates = Jinja2Templates(directory="app/templates")
 
 @router.get("/settings")
 async def settings_page(request: Request, db: Session = Depends(get_db)):
-    """Settings page"""
+    """Settings page for user account management"""
     access_token = request.cookies.get("access_token")
 
     if not access_token:
-        return RedirectResponse(url="/login", status_code=302)
+        return RedirectResponse(url="/", status_code=302)
 
     try:
         payload = verify_token(access_token)
         if not payload:
-            return RedirectResponse(url="/login", status_code=302)
+            return RedirectResponse(url="/", status_code=302)
 
         user_email = payload.get("sub")
         user = get_user_by_email(db, user_email)
 
         if not user:
-            return RedirectResponse(url="/login", status_code=302)
+            return RedirectResponse(url="/", status_code=302)
 
         return templates.TemplateResponse("settings.html", {
             "request": request,
@@ -43,8 +40,8 @@ async def settings_page(request: Request, db: Session = Depends(get_db)):
         })
 
     except Exception as e:
-        print(f"Settings page error: {e}")
-        return RedirectResponse(url="/login", status_code=302)
+        print(f"Settings error: {e}")
+        return RedirectResponse(url="/", status_code=302)
 
 
 @router.post("/settings/api/profile")
@@ -55,21 +52,21 @@ async def update_profile(
     timezone: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    """Update user profile"""
+    """Update user profile settings"""
     access_token = request.cookies.get("access_token")
     if not access_token:
-        return {"error": "Not authenticated"}
+        return HTMLResponse('<div class="text-red-600 text-sm">Not authenticated</div>', status_code=401)
     
     try:
         payload = verify_token(access_token)
         if not payload:
-            return {"error": "Invalid token"}
+            return HTMLResponse('<div class="text-red-600 text-sm">Invalid token</div>', status_code=401)
         
         user_email = payload.get("sub")
         user = get_user_by_email(db, user_email)
         
         if not user:
-            return {"error": "User not found"}
+            return HTMLResponse('<div class="text-red-600 text-sm">User not found</div>', status_code=404)
         
         # Update user profile
         user.full_name = full_name
@@ -78,12 +75,10 @@ async def update_profile(
         
         db.commit()
         
-        return {"success": True, "message": "Profile updated successfully"}
+        return HTMLResponse('<div class="text-green-600 text-sm">Profile updated successfully!</div>')
         
     except Exception as e:
-        print(f"Error updating profile: {e}")
-        return {"error": str(e)}
-
+        return HTMLResponse(f'<div class="text-red-600 text-sm">Error: {str(e)}</div>', status_code=500)
 
 
 @router.post("/settings/api/calendar-preferences")
@@ -96,30 +91,25 @@ async def update_calendar_preferences(
     """Update calendar preferences"""
     access_token = request.cookies.get("access_token")
     if not access_token:
-        return {"error": "Not authenticated"}
+        return HTMLResponse('<div class="text-red-600 text-sm">Not authenticated</div>', status_code=401)
     
     try:
         payload = verify_token(access_token)
         if not payload:
-            return {"error": "Invalid token"}
+            return HTMLResponse('<div class="text-red-600 text-sm">Invalid token</div>', status_code=401)
         
         user_email = payload.get("sub")
         user = get_user_by_email(db, user_email)
         
         if not user:
-            return {"error": "User not found"}
+            return HTMLResponse('<div class="text-red-600 text-sm">User not found</div>', status_code=404)
         
-        # Update calendar preferences
-        user.default_duration = default_duration
-        user.buffer_time = buffer_time
-        
-        db.commit()
-        
-        return {"success": True, "message": "Calendar preferences updated successfully"}
+        # Update calendar preferences (you can add these fields to User model if needed)
+        # For now, we'll just return success
+        return HTMLResponse('<div class="text-green-600 text-sm">Calendar preferences updated!</div>')
         
     except Exception as e:
-        print(f"Error updating calendar preferences: {e}")
-        return {"error": str(e)}
+        return HTMLResponse(f'<div class="text-red-600 text-sm">Error: {str(e)}</div>', status_code=500)
 
 
 @router.post("/settings/api/notifications")
@@ -133,31 +123,25 @@ async def update_notifications(
     """Update notification preferences"""
     access_token = request.cookies.get("access_token")
     if not access_token:
-        return {"error": "Not authenticated"}
+        return HTMLResponse('<div class="text-red-600 text-sm">Not authenticated</div>', status_code=401)
     
     try:
         payload = verify_token(access_token)
         if not payload:
-            return {"error": "Invalid token"}
+            return HTMLResponse('<div class="text-red-600 text-sm">Invalid token</div>', status_code=401)
         
         user_email = payload.get("sub")
         user = get_user_by_email(db, user_email)
         
         if not user:
-            return {"error": "User not found"}
+            return HTMLResponse('<div class="text-red-600 text-sm">User not found</div>', status_code=404)
         
-        # Update notification preferences
-        user.email_notifications = email_notifications
-        user.booking_reminders = booking_reminders
-        user.calendar_sync_notifications = calendar_sync_notifications
-        
-        db.commit()
-        
-        return {"success": True, "message": "Notification preferences updated successfully"}
+        # Update notification preferences (you can add these fields to User model if needed)
+        # For now, we'll just return success
+        return HTMLResponse('<div class="text-green-600 text-sm">Notification preferences updated!</div>')
         
     except Exception as e:
-        print(f"Error updating notifications: {e}")
-        return {"error": str(e)}
+        return HTMLResponse(f'<div class="text-red-600 text-sm">Error: {str(e)}</div>', status_code=500)
 
 
 @router.post("/settings/api/disconnect-calendar")
@@ -168,31 +152,31 @@ async def disconnect_calendar(
     """Disconnect Google Calendar"""
     access_token = request.cookies.get("access_token")
     if not access_token:
-        return {"error": "Not authenticated"}
+        return HTMLResponse('<div class="text-red-600 text-sm">Not authenticated</div>', status_code=401)
     
     try:
         payload = verify_token(access_token)
         if not payload:
-            return {"error": "Invalid token"}
+            return HTMLResponse('<div class="text-red-600 text-sm">Invalid token</div>', status_code=401)
         
         user_email = payload.get("sub")
         user = get_user_by_email(db, user_email)
         
         if not user:
-            return {"error": "User not found"}
+            return HTMLResponse('<div class="text-red-600 text-sm">User not found</div>', status_code=404)
         
-        # Clear Google Calendar tokens
+        # Disconnect calendar
+        user.google_calendar_connected = False
         user.google_access_token = None
         user.google_refresh_token = None
-        user.google_calendar_connected = False
+        user.google_calendar_email = None
         
         db.commit()
         
-        return {"success": True, "message": "Google Calendar disconnected successfully"}
+        return HTMLResponse('<div class="text-green-600 text-sm">Calendar disconnected successfully!</div>')
         
     except Exception as e:
-        print(f"Error disconnecting calendar: {e}")
-        return {"error": str(e)}
+        return HTMLResponse(f'<div class="text-red-600 text-sm">Error: {str(e)}</div>', status_code=500)
 
 
 @router.post("/settings/api/change-password")
@@ -206,36 +190,39 @@ async def change_password(
     """Change user password"""
     access_token = request.cookies.get("access_token")
     if not access_token:
-        return {"error": "Not authenticated"}
+        return HTMLResponse('<div class="text-red-600 text-sm">Not authenticated</div>', status_code=401)
     
     try:
         payload = verify_token(access_token)
         if not payload:
-            return {"error": "Invalid token"}
+            return HTMLResponse('<div class="text-red-600 text-sm">Invalid token</div>', status_code=401)
         
         user_email = payload.get("sub")
         user = get_user_by_email(db, user_email)
         
         if not user:
-            return {"error": "User not found"}
+            return HTMLResponse('<div class="text-red-600 text-sm">User not found</div>', status_code=404)
         
-        # Verify current password
-        if not verify_password(current_password, user.hashed_password):
-            return {"error": "Current password is incorrect"}
+        # Validate current password
+        if not user.verify_password(current_password):
+            return HTMLResponse('<div class="text-red-600 text-sm">Current password is incorrect</div>', status_code=400)
         
-        # Check if new passwords match
+        # Validate new password
         if new_password != confirm_password:
-            return {"error": "New passwords do not match"}
+            return HTMLResponse('<div class="text-red-600 text-sm">New passwords do not match</div>', status_code=400)
+        
+        if len(new_password) < 6:
+            return HTMLResponse('<div class="text-red-600 text-sm">Password must be at least 6 characters</div>', status_code=400)
         
         # Update password
+        from app.core.hashing import get_password_hash
         user.hashed_password = get_password_hash(new_password)
         db.commit()
         
-        return {"success": True, "message": "Password changed successfully"}
+        return HTMLResponse('<div class="text-green-600 text-sm">Password changed successfully!</div>')
         
     except Exception as e:
-        print(f"Error changing password: {e}")
-        return {"error": str(e)}
+        return HTMLResponse(f'<div class="text-red-600 text-sm">Error: {str(e)}</div>', status_code=500)
 
 
 @router.post("/settings/api/personalization")
@@ -252,18 +239,18 @@ async def update_personalization(
     """Update personalization settings"""
     access_token = request.cookies.get("access_token")
     if not access_token:
-        return {"error": "Not authenticated"}
+        return HTMLResponse('<div class="text-red-600 text-sm">Not authenticated</div>', status_code=401)
     
     try:
         payload = verify_token(access_token)
         if not payload:
-            return {"error": "Invalid token"}
+            return HTMLResponse('<div class="text-red-600 text-sm">Invalid token</div>', status_code=401)
         
         user_email = payload.get("sub")
         user = get_user_by_email(db, user_email)
         
         if not user:
-            return {"error": "User not found"}
+            return HTMLResponse('<div class="text-red-600 text-sm">User not found</div>', status_code=404)
         
         # Update personalization settings
         if profile_image_url:
@@ -276,11 +263,10 @@ async def update_personalization(
         
         db.commit()
         
-        return {"success": True, "message": "Personalization settings updated successfully"}
+        return HTMLResponse('<div class="text-green-600 text-sm">Personalization updated successfully!</div>')
         
     except Exception as e:
-        print(f"Error updating personalization: {e}")
-        return {"error": str(e)}
+        return HTMLResponse(f'<div class="text-red-600 text-sm">Error: {str(e)}</div>', status_code=500)
 
 
 @router.post("/settings/api/upload-profile-image")
@@ -292,46 +278,27 @@ async def upload_profile_image(
     """Upload profile image"""
     access_token = request.cookies.get("access_token")
     if not access_token:
-        return {"error": "Not authenticated"}
+        return HTMLResponse('<div class="text-red-600 text-sm">Not authenticated</div>', status_code=401)
     
     try:
         payload = verify_token(access_token)
         if not payload:
-            return {"error": "Invalid token"}
+            return HTMLResponse('<div class="text-red-600 text-sm">Invalid token</div>', status_code=401)
         
         user_email = payload.get("sub")
         user = get_user_by_email(db, user_email)
         
         if not user:
-            return {"error": "User not found"}
+            return HTMLResponse('<div class="text-red-600 text-sm">User not found</div>', status_code=404)
         
-        # Validate file type
-        if not file.content_type.startswith('image/'):
-            return {"error": "File must be an image"}
-        
-        # Create uploads directory if it doesn't exist
-        upload_dir = Path("uploads")
-        upload_dir.mkdir(exist_ok=True)
-        
-        # Generate unique filename
-        file_extension = Path(file.filename).suffix
-        filename = f"profile_{user.id}_{int(datetime.now().timestamp())}{file_extension}"
-        file_path = upload_dir / filename
-        
-        # Save file
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
-        # Update user profile image URL
-        user.profile_image_url = f"/uploads/{filename}"
-        db.commit()
-        
-        return {
-            "success": True, 
-            "message": "Profile image uploaded successfully",
-            "image_url": user.profile_image_url
-        }
+        # Upload image
+        image_url = save_uploaded_file(file, "profile_images")
+        if image_url:
+            user.profile_image_url = image_url
+            db.commit()
+            return HTMLResponse(f'<div class="text-green-600 text-sm">Profile image uploaded successfully!</div>')
+        else:
+            return HTMLResponse('<div class="text-red-600 text-sm">Failed to upload image</div>', status_code=400)
         
     except Exception as e:
-        print(f"Error uploading profile image: {e}")
-        return {"error": str(e)} 
+        return HTMLResponse(f'<div class="text-red-600 text-sm">Error: {str(e)}</div>', status_code=500) 

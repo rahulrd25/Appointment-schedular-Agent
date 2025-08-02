@@ -43,7 +43,8 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE: int = 5 * 1024 * 1024  # 5MB
     ALLOWED_IMAGE_TYPES: list = ["image/jpeg", "image/png", "image/gif", "image/webp"]
     
-    model_config = {"env_file": ".env"}
+    class Config:
+        env_file = ".env"
 
 
 settings = Settings()

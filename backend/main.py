@@ -1,10 +1,15 @@
 import os
-import logging
-import asyncio
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Form, HTTPException, Depends, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import RedirectResponse, HTMLResponse, PlainTextResponse
+from sqlalchemy.orm import Session
+import pytz
+import asyncio
+from typing import Any
 
 # Load environment variables from .env file if it exists
 env_file = Path(".env")
@@ -18,24 +23,15 @@ if env_file.exists():
 
 from app.api.v1.api import api_router
 from app.core.config import settings
-from app.core.database import Base, engine
-
-# Import routers
-from app.routers import auth, dashboard, bookings, settings as settings_router, public, availability
-
-# Import new calendar sync endpoints
-from app.api.v1.endpoints import calendar_sync, webhooks
-
-# Import background sync service
+from app.core.database import Base, engine, get_db
+from app.services.user_service import authenticate_user, create_user, get_user_by_email
+from app.core.security import create_access_token, verify_token
+from app.schemas.schemas import UserCreate
+from app.models.models import User
 from app.services.sync.background_sync import BackgroundSyncService
 
 # Create database tables (only create if they don't exist)
-Base.metadata.create_all(bind=engine)
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-# Reduce uvicorn access log verbosity
-logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+Base.metadata.create_all(bind=engine)  # Create all tables with updated schema
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -43,6 +39,11 @@ app = FastAPI(
     version="1.0.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
+
+# Define dashboard routes early to avoid conflicts
+
+# Dashboard route is now handled by the modular dashboard router
+# See app/routers/dashboard.py for the correct implementation
 
 # CORS middleware
 app.add_middleware(
@@ -57,72 +58,84 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# Include API router
+# Include API router (with prefix for API endpoints)
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
-# Include all routers
-app.include_router(auth.router, tags=["Authentication"])
-app.include_router(dashboard.router, tags=["Dashboard"])
-app.include_router(bookings.router, tags=["Bookings"])
-app.include_router(settings_router.router, tags=["Settings"])
-app.include_router(availability.router, tags=["Availability"])
-app.include_router(public.router, tags=["Public"])
+# Include other routers FIRST (specific routes)
+from app.routers import dashboard, auth, settings, bookings, availability
+app.include_router(dashboard.router, tags=["dashboard"])
+app.include_router(auth.router, tags=["auth"])
+app.include_router(settings.router, tags=["settings"])
+app.include_router(bookings.router, tags=["bookings"])
+app.include_router(availability.router, tags=["availability"])
 
-# Include new calendar sync and webhook endpoints
-app.include_router(calendar_sync.router, tags=["Calendar Sync"])
-app.include_router(webhooks.router, tags=["Webhooks"])
+# Include public router for page rendering (without prefix)
+from app.api.v1.endpoints import public
+app.include_router(public.router, tags=["public_pages"])
 
-# Background sync service instance
-background_sync_service = None
+# Public booking API routes are handled by api_router (public.py)
+
+# Include webhooks router for Google Calendar sync
+from app.api.v1.endpoints import webhooks
+app.include_router(webhooks.router, prefix="/api/v1/webhooks", tags=["webhooks"])
+
+# Templates for HTML responses
+templates = Jinja2Templates(directory="app/templates")
+
+# Initialize background sync service
+background_sync_service = BackgroundSyncService()
+
 
 @app.on_event("startup")
 async def startup_event():
-    """Start background sync service on application startup."""
-    global background_sync_service
-    try:
-        background_sync_service = BackgroundSyncService()
-        # Start background sync in a separate task
-        asyncio.create_task(background_sync_service.start_periodic_sync())
-        logging.info("Background sync service started successfully")
-    except Exception as e:
-        logging.error(f"Failed to start background sync service: {e}")
+    """Start background sync service on application startup"""
+    print("🚀 Starting Appointment Agent with background sync service...")
+    
+    # Start background sync service
+    asyncio.create_task(background_sync_service.start_periodic_sync())
+    print("🔄 Background sync service started")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Stop background sync service on application shutdown."""
-    global background_sync_service
-    if background_sync_service:
-        await background_sync_service.stop_periodic_sync()
-        logging.info("Background sync service stopped")
+    """Stop background sync service on application shutdown"""
+    print("🛑 Shutting down Appointment Agent...")
+    
+    # Stop background sync service
+    await background_sync_service.stop_periodic_sync()
+    print("🛑 Background sync service stopped")
 
-# Root redirect
+
 @app.get("/")
-async def root():
-    """Redirect root to login page"""
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/login", status_code=302)
+async def root(request: Request):
+    """Root endpoint - redirect to landing page"""
+    return templates.TemplateResponse("index.html", {"request": request})
 
 # Agent redirect
 @app.get("/agent")
-async def agent_redirect():
-    """Redirect /agent to /dashboard"""
-    from fastapi.responses import RedirectResponse
+async def agent_redirect(request: Request):
+    """Redirect to agent page"""
     return RedirectResponse(url="/dashboard", status_code=302)
 
-# Exception handlers
+
+
+
+
+
+
+
+
+# Error handlers
 @app.exception_handler(404)
-async def not_found_handler(request, exc):
+async def not_found_handler(request: Request, exc):
     """Handle 404 errors"""
-    from fastapi.responses import HTMLResponse
-    from fastapi.templating import Jinja2Templates
-    templates = Jinja2Templates(directory="app/templates")
     return templates.TemplateResponse("404.html", {"request": request})
 
 @app.exception_handler(500)
-async def internal_error_handler(request, exc):
+async def internal_error_handler(request: Request, exc):
     """Handle 500 errors"""
-    from fastapi.responses import HTMLResponse
-    from fastapi.templating import Jinja2Templates
-    templates = Jinja2Templates(directory="app/templates")
     return templates.TemplateResponse("500.html", {"request": request})
 
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000) 

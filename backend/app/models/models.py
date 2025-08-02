@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Boolean, Column, Integer, String, DateTime, ForeignKey, JSON, Text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -68,7 +68,7 @@ class Booking(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     host_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    availability_slot_id = Column(Integer, ForeignKey("availability_slots.id"), nullable=False)
+    availability_slot_id = Column(Integer, ForeignKey("availability_slots.id"), nullable=True)  # Nullable for imported calendar events
     
     # Guest information
     guest_name = Column(String, nullable=False)
@@ -84,10 +84,10 @@ class Booking(Base):
     google_event_id = Column(String, nullable=True)  # Store Google Calendar event ID
     
     # Sync status tracking
-    sync_status = Column(String, default="pending")  # pending, synced, failed, conflict
-    last_synced = Column(DateTime(timezone=True), nullable=True)  # Last successful sync timestamp
-    sync_error = Column(String, nullable=True)  # Error message if sync failed
+    sync_status = Column(String, default="pending")  # pending, synced, failed
     sync_attempts = Column(Integer, default=0)  # Number of sync attempts
+    last_synced = Column(DateTime(timezone=True), nullable=True)  # Last sync timestamp
+    sync_error = Column(String, nullable=True)  # Last sync error message
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -95,3 +95,19 @@ class Booking(Base):
     # Relationships
     host = relationship("User", foreign_keys=[host_user_id], back_populates="bookings_as_host")
     availability_slot = relationship("AvailabilitySlot", back_populates="bookings")
+
+class PendingCalendarConnection(Base):
+    __tablename__ = "pending_calendar_connections"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Can be null initially, set during completion
+    calendar_email = Column(String, nullable=False)
+    calendar_name = Column(String, nullable=True)
+    access_token = Column(Text, nullable=False)
+    refresh_token = Column(Text, nullable=True)
+    scope = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)  # 10 minutes from creation
+    
+    # Relationship
+    user = relationship("User", backref="pending_connections")

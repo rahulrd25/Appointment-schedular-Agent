@@ -1,34 +1,49 @@
-{% if message %}
-<div class="mt-4 p-4 {% if success %}bg-green-50 border-green-200 text-green-800{% else %}bg-red-50 border-red-200 text-red-800{% endif %} border rounded-lg">
-    <div class="flex items-center">
-        {% if success %}
-        <svg class="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
-        {% else %}
-        <svg class="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
-        {% endif %}
-        <span class="font-medium">{{ message }}</span>
+{% extends "authenticated_base.html" %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto p-6">
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-center space-x-3 mb-4">
+            {% if success %}
+                <div class="flex-shrink-0">
+                    <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+            {% else %}
+                <div class="flex-shrink-0">
+                    <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </div>
+            {% endif %}
+            <div class="flex-1">
+                <h3 class="text-lg font-medium {% if success %}text-green-800{% else %}text-red-800{% endif %}">
+                    {% if success %}Success{% else %}Error{% endif %}
+                </h3>
+                <p class="text-sm {% if success %}text-green-600{% else %}text-red-600{% endif %}">
+                    {{ message }}
+                </p>
+            </div>
+        </div>
+        
+        <div class="mt-4 flex space-x-3">
+            <button onclick="window.location.reload()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200">
+                Refresh Page
+            </button>
+            <button onclick="history.back()" class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors duration-200">
+                Go Back
+            </button>
+        </div>
     </div>
-    {% if slots_created %}
-    <p class="text-sm mt-1 {% if success %}text-green-600{% else %}text-red-600{% endif %}">
-        Created {{ slots_created }} time slot{{ 's' if slots_created != 1 else '' }}.
-    </p>
-    {% endif %}
 </div>
 
-{% if success %}
 <script>
-    // Wait 1 second then refresh the availability card
-    setTimeout(() => {
-        // Find the Vue.js component and refresh dashboard data
-        const dashboardApp = document.querySelector('#dashboard-app').__vue_app;
-        if (dashboardApp && dashboardApp._instance && dashboardApp._instance.proxy.loadDashboardData) {
-            dashboardApp._instance.proxy.loadDashboardData();
-        }
-    }, 1000);
+    // Auto-refresh the page after 2 seconds if successful
+    {% if success %}
+    setTimeout(function() {
+        window.location.reload();
+    }, 2000);
+    {% endif %}
 </script>
-{% endif %}
-{% endif %} 
+{% endblock %} 

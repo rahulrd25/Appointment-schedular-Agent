@@ -29,7 +29,7 @@ class SyncConfig:
         self.retry_delay = 5  # seconds
         self.batch_size = 50
         self.sync_interval = timedelta(minutes=15)
-        self.background_sync_interval = 300  # 5 minutes in seconds
+        self.background_sync_interval = 60  # 1 minute in seconds (for testing)
         
         # Conflict resolution settings
         self.conflict_resolution = "database_wins"  # or "provider_wins", "manual"

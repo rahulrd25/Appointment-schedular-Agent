@@ -1,16 +1,15 @@
-from fastapi import APIRouter, Request, Form, HTTPException, Depends
-from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Request, Form, Depends, HTTPException
+from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from datetime import datetime, timedelta, timezone
+from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
+import pytz
 
-from app.core.database import get_db
-from app.services.user_service import get_user_by_email
+from app.api.deps import get_db
 from app.core.security import verify_token
-from app.services.availability_service import (
-    get_availability_slots_for_user,
-    create_availability_slot
-)
+from app.services.user_service import get_user_by_email
+from app.services.availability_service import create_availability_slot
+from app.schemas.schemas import AvailabilitySlotCreate
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -18,26 +17,34 @@ templates = Jinja2Templates(directory="app/templates")
 
 @router.get("/availability")
 async def availability_page(request: Request, db: Session = Depends(get_db)):
-    """Availability page"""
+    """Availability management page"""
     access_token = request.cookies.get("access_token")
 
     if not access_token:
-        return RedirectResponse(url="/login", status_code=302)
+        return RedirectResponse(url="/", status_code=302)
 
     try:
         payload = verify_token(access_token)
         if not payload:
-            return RedirectResponse(url="/login", status_code=302)
+            return RedirectResponse(url="/", status_code=302)
 
         user_email = payload.get("sub")
         user = get_user_by_email(db, user_email)
 
         if not user:
-            return RedirectResponse(url="/login", status_code=302)
+            return RedirectResponse(url="/", status_code=302)
 
-        # Get user's availability slots
+        # Get all availability slots (including unavailable ones from imported calendar events)
         from app.services.availability_service import get_availability_slots_for_user
-        availability_slots = get_availability_slots_for_user(db, user.id)
+        availability_slots = get_availability_slots_for_user(db, user.id, include_unavailable=True)
+        
+        # Convert slots to user's timezone for display
+        user_timezone = pytz.timezone(user.timezone or 'UTC')
+        
+        for slot in availability_slots:
+            # Convert UTC times to user's timezone for display
+            slot.start_time_local = slot.start_time.astimezone(user_timezone)
+            slot.end_time_local = slot.end_time.astimezone(user_timezone)
         
         return templates.TemplateResponse("availability.html", {
             "request": request,
@@ -47,46 +54,7 @@ async def availability_page(request: Request, db: Session = Depends(get_db)):
 
     except Exception as e:
         print(f"Availability page error: {e}")
-        return RedirectResponse(url="/login", status_code=302)
-
-
-@router.get("/dashboard/api/availability/available")
-async def get_dashboard_available_slots(request: Request, db: Session = Depends(get_db)):
-    """Get available slots for dashboard"""
-    access_token = request.cookies.get("access_token")
-    if not access_token:
-        return {"error": "Not authenticated"}
-    
-    try:
-        payload = verify_token(access_token)
-        if not payload:
-            return {"error": "Invalid token"}
-        
-        user_email = payload.get("sub")
-        user = get_user_by_email(db, user_email)
-        
-        if not user:
-            return {"error": "User not found"}
-        
-        # Get available slots
-        available_slots = get_availability_slots_for_user(db, user.id)
-        
-        # Format for dashboard
-        formatted_slots = []
-        for slot in available_slots:
-            formatted_slots.append({
-                "id": slot.id,
-                "date": slot.start_time.strftime("%Y-%m-%d"),
-                "time": slot.start_time.strftime("%H:%M"),
-                "end_time": slot.end_time.strftime("%H:%M"),
-                "duration": int((slot.end_time - slot.start_time).total_seconds() / 60)
-            })
-        
-        return {"slots": formatted_slots}
-        
-    except Exception as e:
-        print(f"Error in get_dashboard_available_slots: {e}")
-        return {"error": str(e)}
+        return RedirectResponse(url="/", status_code=302)
 
 
 @router.post("/dashboard/api/availability/")
@@ -97,125 +65,90 @@ async def add_dashboard_availability_slot(
     period: int = Form(30),
     db: Session = Depends(get_db)
 ):
-    """Add a single availability slot"""
+    """Add a single availability slot from dashboard"""
     access_token = request.cookies.get("access_token")
     if not access_token:
-        from fastapi.responses import HTMLResponse
-        return HTMLResponse(content="""
-        <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-            <div class="flex items-center">
-                <svg class="w-5 h-5 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-                </svg>
-                <p class="text-red-800 text-sm font-medium">Not authenticated</p>
-            </div>
-        </div>
-        """)
+        return templates.TemplateResponse("availability_response_fragment.html", {
+            "request": request,
+            "message": "Authentication required. Please log in again.",
+            "success": False
+        })
     
     try:
         payload = verify_token(access_token)
         if not payload:
-            from fastapi.responses import HTMLResponse
-            return HTMLResponse(content="""
-            <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                <div class="flex items-center">
-                    <svg class="w-5 h-5 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-                    </svg>
-                    <p class="text-red-800 text-sm font-medium">Invalid token</p>
-                </div>
-            </div>
-            """)
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": "Invalid session. Please log in again.",
+                "success": False
+            })
         
         user_email = payload.get("sub")
         user = get_user_by_email(db, user_email)
-        
         if not user:
-            from fastapi.responses import HTMLResponse
-            return HTMLResponse(content="""
-            <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                <div class="flex items-center">
-                    <svg class="w-5 h-5 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-                    </svg>
-                    <p class="text-red-800 text-sm font-medium">User not found</p>
-                </div>
-            </div>
-            """)
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": "User not found. Please log in again.",
+                "success": False
+            })
         
-        # Parse date and time
+        # Parse date and time in user's timezone
         try:
-            datetime_str = f"{date} {start_time}"
-            start_datetime = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M")
-            end_datetime = start_datetime + timedelta(minutes=period)
-        except ValueError:
-            from fastapi.responses import HTMLResponse
-            return HTMLResponse(content="""
-            <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                <div class="flex items-center">
-                    <svg class="w-5 h-5 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-                    </svg>
-                    <p class="text-red-800 text-sm font-medium">Invalid date/time format</p>
-                </div>
-            </div>
-            """)
+            # Get user's timezone (default to UTC if not set)
+            user_timezone = pytz.timezone(user.timezone or 'UTC')
+            
+            # Parse the datetime in user's timezone
+            naive_datetime = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %H:%M")
+            local_datetime = user_timezone.localize(naive_datetime)
+            
+            # Calculate end time in user's local timezone first
+            local_end_datetime = local_datetime + timedelta(minutes=period)
+            
+            # Convert both to UTC for database storage
+            start_datetime = local_datetime.astimezone(pytz.UTC)
+            end_datetime = local_end_datetime.astimezone(pytz.UTC)
+            
+        except ValueError as e:
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": f"Invalid date or time format: {str(e)}",
+                "success": False
+            })
+        except Exception as e:
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": f"Timezone error: {str(e)}",
+                "success": False
+            })
         
-        # Create availability slot
-        from app.schemas.schemas import AvailabilitySlotCreate
-        
+        # Create the availability slot
         slot_data = AvailabilitySlotCreate(
+            user_id=user.id,
             start_time=start_datetime,
-            end_time=end_datetime,
-            is_available=True
+            end_time=end_datetime
         )
         
         result = create_availability_slot(db, slot_data, user.id)
         
-        if result["success"]:
-            # Return HTML success message for HTMX
-            from fastapi.responses import HTMLResponse
-            success_html = f"""
-            <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                <div class="flex items-center">
-                    <svg class="w-5 h-5 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-                    </svg>
-                    <p class="text-green-800 text-sm font-medium">Availability slot created successfully!</p>
-                </div>
-            </div>
-            """
-            return HTMLResponse(content=success_html)
+        if result.get("success"):
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": f"✅ Availability slot created successfully for {date} at {start_time}",
+                "success": True
+            })
         else:
-            # Return HTML error message for HTMX
-            from fastapi.responses import HTMLResponse
-            error_html = f"""
-            <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                <div class="flex items-center">
-                    <svg class="w-5 h-5 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-                    </svg>
-                    <p class="text-red-800 text-sm font-medium">{result["message"]}</p>
-                </div>
-            </div>
-            """
-            return HTMLResponse(content=error_html)
-        
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": result.get("message", "❌ Failed to create availability slot. Please try again."),
+                "success": False
+            })
+            
     except Exception as e:
-        print(f"Error creating availability slot: {e}")
-        # Return HTML error message for HTMX
-        from fastapi.responses import HTMLResponse
-        error_html = f"""
-        <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-            <div class="flex items-center">
-                <svg class="w-5 h-5 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
-                </svg>
-                <p class="text-red-800 text-sm font-medium">Error: {str(e)}</p>
-            </div>
-        </div>
-        """
-        return HTMLResponse(content=error_html)
+        return templates.TemplateResponse("availability_response_fragment.html", {
+            "request": request,
+            "message": f"❌ Error: {str(e)}",
+            "success": False
+        })
 
 
 @router.post("/dashboard/api/availability/recurring")
@@ -229,8 +162,110 @@ async def add_recurring_availability_slots(
     days: list = Form(...),
     db: Session = Depends(get_db)
 ):
-    """Add recurring availability slots - TODO: Implement this function"""
-    return {"error": "Recurring availability slots not implemented yet"}
+    """Add recurring availability slots"""
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        return templates.TemplateResponse("availability_response_fragment.html", {
+            "request": request,
+            "message": "Authentication required. Please log in again.",
+            "success": False
+        })
+    
+    try:
+        payload = verify_token(access_token)
+        if not payload:
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": "Invalid session. Please log in again.",
+                "success": False
+            })
+        
+        user_email = payload.get("sub")
+        user = get_user_by_email(db, user_email)
+        if not user:
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": "User not found. Please log in again.",
+                "success": False
+            })
+        
+        # Parse dates and times
+        try:
+            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
+            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+            start_time_obj = datetime.strptime(start_time, "%H:%M").time()
+            end_time_obj = datetime.strptime(end_time, "%H:%M").time()
+        except ValueError as e:
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": f"Invalid date or time format: {str(e)}",
+                "success": False
+            })
+        
+        # Convert days to integers
+        try:
+            selected_days = [int(day) for day in days]
+        except ValueError:
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": "Invalid day selection",
+                "success": False
+            })
+        
+        # Generate slots for each selected day
+        current_date = start_date_obj
+        created_slots = 0
+        failed_slots = []
+        
+        while current_date <= end_date_obj:
+            if current_date.weekday() in selected_days:
+                # Create slots for this day
+                current_time = datetime.combine(current_date, start_time_obj)
+                end_time_combined = datetime.combine(current_date, end_time_obj)
+                
+                while current_time + timedelta(minutes=slot_duration) <= end_time_combined:
+                    slot_end = current_time + timedelta(minutes=slot_duration)
+                    
+                    # Only create slots in the future
+                    if current_time > datetime.utcnow():
+                        slot_data = AvailabilitySlotCreate(
+                            user_id=user.id,
+                            start_time=current_time,
+                            end_time=slot_end
+                        )
+                        
+                        result = create_availability_slot(db, slot_data, user.id)
+                        if result.get("success"):
+                            created_slots += 1
+                        else:
+                            failed_slots.append(f"{current_time.strftime('%Y-%m-%d %H:%M')} - {result.get('message', 'Unknown error')}")
+                    
+                    current_time = slot_end
+            
+            current_date += timedelta(days=1)
+        
+        if created_slots > 0:
+            message = f"✅ Created {created_slots} availability slots"
+            if failed_slots:
+                message += f" ({len(failed_slots)} failed)"
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": message,
+                "success": True
+            })
+        else:
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": f"Failed to create any slots. {len(failed_slots)} errors occurred.",
+                "success": False
+            })
+            
+    except Exception as e:
+        return templates.TemplateResponse("availability_response_fragment.html", {
+            "request": request,
+            "message": f"❌ Error: {str(e)}",
+            "success": False
+        })
 
 
 @router.post("/dashboard/api/availability/bulk")
@@ -245,82 +280,208 @@ async def add_bulk_availability_slots(
     days: list = Form(...),
     db: Session = Depends(get_db)
 ):
-    """Add bulk availability slots using templates - TODO: Implement this function"""
-    return {"error": "Bulk availability slots not implemented yet"}
-
-
-@router.post("/dashboard/api/availability/quick")
-async def add_quick_availability_slots(
-    request: Request, 
-    db: Session = Depends(get_db)
-):
-    """Add quick availability slots for next week"""
+    """Add bulk availability slots using templates"""
     access_token = request.cookies.get("access_token")
     if not access_token:
-        return {"error": "Not authenticated"}
+        return templates.TemplateResponse("availability_response_fragment.html", {
+            "request": request,
+            "message": "Authentication required. Please log in again.",
+            "success": False
+        })
     
     try:
         payload = verify_token(access_token)
         if not payload:
-            return {"error": "Invalid token"}
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": "Invalid session. Please log in again.",
+                "success": False
+            })
         
         user_email = payload.get("sub")
         user = get_user_by_email(db, user_email)
-        
         if not user:
-            return {"error": "User not found"}
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": "User not found. Please log in again.",
+                "success": False
+            })
         
-        # Get JSON data from request
-        data = await request.json()
-        slots_data = data.get("slots", [])
+        # Parse dates and times
+        try:
+            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
+            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+            start_time_obj = datetime.strptime(start_time, "%H:%M").time()
+            end_time_obj = datetime.strptime(end_time, "%H:%M").time()
+        except ValueError as e:
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": f"Invalid date or time format: {str(e)}",
+                "success": False
+            })
+        
+        # Convert days to integers
+        try:
+            selected_days = [int(day) for day in days]
+        except ValueError:
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": "Invalid day selection",
+                "success": False
+            })
+        
+        # Generate slots for each selected day
+        current_date = start_date_obj
+        created_slots = 0
+        failed_slots = []
+        
+        while current_date <= end_date_obj:
+            if current_date.weekday() in selected_days:
+                # Create slots for this day
+                current_time = datetime.combine(current_date, start_time_obj)
+                end_time_combined = datetime.combine(current_date, end_time_obj)
+                
+                while current_time + timedelta(minutes=slot_duration) <= end_time_combined:
+                    slot_end = current_time + timedelta(minutes=slot_duration)
+                    
+                    # Only create slots in the future
+                    if current_time > datetime.utcnow():
+                        slot_data = AvailabilitySlotCreate(
+                            user_id=user.id,
+                            start_time=current_time,
+                            end_time=slot_end
+                        )
+                        
+                        result = create_availability_slot(db, slot_data, user.id)
+                        if result.get("success"):
+                            created_slots += 1
+                        else:
+                            failed_slots.append(f"{current_time.strftime('%Y-%m-%d %H:%M')} - {result.get('message', 'Unknown error')}")
+                    
+                    current_time = slot_end
+            
+            current_date += timedelta(days=1)
+        
+        if created_slots > 0:
+            message = f"✅ Created {created_slots} availability slots using {template} template"
+            if failed_slots:
+                message += f" ({len(failed_slots)} failed)"
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": message,
+                "success": True
+            })
+        else:
+            return templates.TemplateResponse("availability_response_fragment.html", {
+                "request": request,
+                "message": f"Failed to create any slots. {len(failed_slots)} errors occurred.",
+                "success": False
+            })
+            
+    except Exception as e:
+        return templates.TemplateResponse("availability_response_fragment.html", {
+            "request": request,
+            "message": f"❌ Error: {str(e)}",
+            "success": False
+        })
+
+
+@router.post("/dashboard/api/availability/quick")
+async def add_quick_availability_slots(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Add quick availability slots based on frontend request"""
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        return JSONResponse({
+            "success": False,
+            "message": "Authentication required. Please log in again."
+        })
+    
+    try:
+        payload = verify_token(access_token)
+        if not payload:
+            return JSONResponse({
+                "success": False,
+                "message": "Invalid session. Please log in again."
+            })
+        
+        user_email = payload.get("sub")
+        user = get_user_by_email(db, user_email)
+        if not user:
+            return JSONResponse({
+                "success": False,
+                "message": "User not found. Please log in again."
+            })
+        
+        # Parse JSON request body
+        body = await request.json()
+        slots_data = body.get("slots", [])
         
         if not slots_data:
-            return {"error": "No slots provided"}
+            return JSONResponse({
+                "success": False,
+                "message": "No slots provided"
+            })
         
-        # Create availability slots
-        slots_created = 0
-        errors = []
+        created_slots = 0
+        failed_slots = []
         
         for slot_data in slots_data:
             try:
                 # Parse date and time
-                datetime_str = f"{slot_data['date']} {slot_data['start_time']}"
-                start_datetime = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M")
-                end_datetime = start_datetime + timedelta(minutes=slot_data.get('period', 30))
+                date_str = slot_data.get("date")
+                time_str = slot_data.get("start_time")
+                period = slot_data.get("period", 30)
                 
-                # Create slot data
-                from app.schemas.schemas import AvailabilitySlotCreate
-                slot_create_data = AvailabilitySlotCreate(
-                    start_time=start_datetime,
-                    end_time=end_datetime,
-                    is_available=True
-                )
+                if not date_str or not time_str:
+                    failed_slots.append(f"Invalid slot data: {slot_data}")
+                    continue
                 
-                # Create slot
-                result = create_availability_slot(db, slot_create_data, user.id)
+                # Combine date and time
+                datetime_str = f"{date_str} {time_str}"
+                start_time = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M")
+                end_time = start_time + timedelta(minutes=period)
                 
-                if result["success"]:
-                    slots_created += 1
+                # Only create slots in the future
+                if start_time > datetime.utcnow():
+                    slot_create_data = AvailabilitySlotCreate(
+                        user_id=user.id,
+                        start_time=start_time,
+                        end_time=end_time
+                    )
+                    
+                    result = create_availability_slot(db, slot_create_data, user.id)
+                    if result.get("success"):
+                        created_slots += 1
+                    else:
+                        failed_slots.append(f"{start_time.strftime('%Y-%m-%d %H:%M')} - {result.get('message', 'Unknown error')}")
                 else:
-                    errors.append(f"Slot {slot_data['date']} {slot_data['start_time']}: {result['message']}")
+                    failed_slots.append(f"{start_time.strftime('%Y-%m-%d %H:%M')} - Slot is in the past")
                     
             except Exception as e:
-                errors.append(f"Slot {slot_data['date']} {slot_data['start_time']}: {str(e)}")
+                failed_slots.append(f"Error processing slot {slot_data}: {str(e)}")
         
-        if slots_created > 0:
-            return {
+        if created_slots > 0:
+            message = f"✅ Created {created_slots} availability slots"
+            if failed_slots:
+                message += f" ({len(failed_slots)} failed)"
+            return JSONResponse({
                 "success": True,
-                "slots_created": slots_created,
-                "message": f"Successfully created {slots_created} availability slots!",
-                "errors": errors if errors else None
-            }
+                "message": message,
+                "slots_created": created_slots,
+                "failed_count": len(failed_slots)
+            })
         else:
-            return {
+            return JSONResponse({
                 "success": False,
-                "message": "Failed to create any slots",
-                "errors": errors
-            }
-        
+                "message": f"Failed to create any slots. {len(failed_slots)} errors occurred.",
+                "failed_count": len(failed_slots)
+            })
+            
     except Exception as e:
-        print(f"Error in add_quick_availability_slots: {e}")
-        return {"error": str(e)} 
+        return JSONResponse({
+            "success": False,
+            "message": f"❌ Error: {str(e)}"
+        }) 

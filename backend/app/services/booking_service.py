@@ -8,7 +8,6 @@ from app.models.models import Booking, AvailabilitySlot, User
 from app.schemas.schemas import BookingCreate, BookingUpdate, PublicBookingCreate
 from app.services.availability_service import get_availability_slot, check_slot_availability
 from app.services.google_calendar_service import GoogleCalendarService
-from app.core.timezone_utils import TimezoneManager, ensure_utc_datetime, format_datetime_for_user
 
 
 
@@ -73,17 +72,13 @@ def create_booking(
                     booking.sync_status = "synced"
                     booking.last_synced = datetime.utcnow()
                     calendar_created = True
-                    print(f"✅ Event created in calendar and DB for booking {booking.id}")
                 else:
                     booking.sync_status = "failed"
                     booking.sync_error = "Calendar event creation failed"
-                    calendar_error = "Failed to create calendar event"
                     
             except Exception as e:
                 booking.sync_status = "failed"
                 booking.sync_error = str(e)
-                calendar_error = str(e)
-                print(f"❌ Calendar event creation failed for booking {booking.id}: {e}")
         
         # Commit the booking
         db.commit()
@@ -108,14 +103,28 @@ def create_booking(
         except Exception as e:
             print(f"❌ Email sending failed for booking {booking.id}: {e}")
         
-        if calendar_created and email_sent:
-            print(f"✅ Booking {booking.id} completed: Event in calendar, DB, and email sent")
-        elif calendar_created:
-            print(f"✅ Booking {booking.id} completed: Event in calendar and DB, but email failed")
-        elif email_sent:
-            print(f"✅ Booking {booking.id} completed: Event in DB and email sent, but calendar failed")
+        # Delete the availability slot since it's now booked
+        try:
+            db.delete(slot)
+            slot_deleted = True
+            print(f"🗑️ Deleted availability slot {slot_id} after booking {booking.id}")
+        except Exception as e:
+            slot_deleted = False
+            print(f"❌ Failed to delete availability slot {slot_id}: {e}")
+        
+        # Commit the slot deletion
+        db.commit()
+        
+        if calendar_created and email_sent and slot_deleted:
+            print(f"✅ Booking {booking.id} completed: Event in calendar, DB, email sent, and slot deleted")
+        elif calendar_created and slot_deleted:
+            print(f"✅ Booking {booking.id} completed: Event in calendar and DB, slot deleted, but email failed")
+        elif email_sent and slot_deleted:
+            print(f"✅ Booking {booking.id} completed: Event in DB, email sent, slot deleted, but calendar failed")
+        elif slot_deleted:
+            print(f"✅ Booking {booking.id} created in DB and slot deleted: Calendar and email failed")
         else:
-            print(f"⚠️ Booking {booking.id} created in DB only: Calendar and email failed")
+            print(f"⚠️ Booking {booking.id} created in DB only: Calendar, email, and slot deletion failed")
         
         return booking
         
@@ -232,14 +241,40 @@ def cancel_booking(db: Session, booking_id: int, user_id: int = None) -> bool:
             except Exception as e:
                 print(f"❌ Calendar deletion failed for booking {booking.id}: {e}")
         
+        # Store booking details before deletion for slot recreation
+        booking_start_time = booking.start_time
+        booking_end_time = booking.end_time
+        host_user_id = booking.host_user_id
+        
         # Delete from database
         db.delete(booking)
+        
+        # Recreate the availability slot since the booking was cancelled
+        try:
+            from app.models.models import AvailabilitySlot
+            new_slot = AvailabilitySlot(
+                user_id=host_user_id,
+                start_time=booking_start_time,
+                end_time=booking_end_time,
+                is_available=True
+            )
+            db.add(new_slot)
+            slot_recreated = True
+            print(f"🔄 Recreated availability slot after booking {booking_id} cancellation")
+        except Exception as e:
+            slot_recreated = False
+            print(f"❌ Failed to recreate availability slot after booking cancellation: {e}")
+        
         db.commit()
         
-        if calendar_deleted:
-            print(f"✅ Booking {booking.id} cancelled: Event removed from calendar and DB")
+        if calendar_deleted and slot_recreated:
+            print(f"✅ Booking {booking_id} cancelled: Event removed from calendar and DB, slot recreated")
+        elif calendar_deleted:
+            print(f"✅ Booking {booking_id} cancelled: Event removed from calendar and DB, but slot recreation failed")
+        elif slot_recreated:
+            print(f"✅ Booking {booking_id} cancelled: Event removed from DB and slot recreated, but calendar deletion failed")
         else:
-            print(f"✅ Booking {booking.id} cancelled: Event removed from DB only")
+            print(f"✅ Booking {booking_id} cancelled: Event removed from DB only")
         
         return True
         
@@ -576,6 +611,40 @@ def reschedule_booking_by_id(db: Session, booking_id: int, new_start_time: datet
         booking.end_time = new_end_time
         booking.updated_at = datetime.utcnow()
         
+        # Handle availability slot for reschedule
+        # Since we delete slots when bookings are created, we need to:
+        # 1. Create a new slot for the new time (if it's in the future)
+        # 2. The old slot is already deleted when the booking was created
+        slot_created = False
+        if new_start_time > datetime.utcnow():
+            try:
+                from app.models.models import AvailabilitySlot
+                # Check if there's already a slot for the new time
+                existing_slot = db.query(AvailabilitySlot).filter(
+                    and_(
+                        AvailabilitySlot.user_id == user.id,
+                        AvailabilitySlot.start_time == new_start_time,
+                        AvailabilitySlot.end_time == new_end_time
+                    )
+                ).first()
+                
+                if not existing_slot:
+                    # Create new availability slot for the new time
+                    new_slot = AvailabilitySlot(
+                        user_id=user.id,
+                        start_time=new_start_time,
+                        end_time=new_end_time,
+                        is_available=True
+                    )
+                    db.add(new_slot)
+                    slot_created = True
+                    print(f"🔄 Created new availability slot for rescheduled booking {booking.id}")
+                else:
+                    print(f"⚠️ Availability slot already exists for rescheduled time")
+                    
+            except Exception as e:
+                print(f"❌ Failed to create availability slot for rescheduled booking: {e}")
+        
         # Try to update Google Calendar event
         calendar_updated = False
         if booking.google_event_id and user.google_calendar_connected:
@@ -615,8 +684,12 @@ def reschedule_booking_by_id(db: Session, booking_id: int, new_start_time: datet
         # Commit changes
         db.commit()
         
-        if calendar_updated:
-            print(f"✅ Booking {booking.id} rescheduled: Event updated in calendar and DB")
+        if calendar_updated and slot_created:
+            print(f"✅ Booking {booking.id} rescheduled: Event updated in calendar and DB, new slot created")
+        elif calendar_updated:
+            print(f"✅ Booking {booking.id} rescheduled: Event updated in calendar and DB, but slot creation failed")
+        elif slot_created:
+            print(f"✅ Booking {booking.id} rescheduled: Event updated in DB and new slot created, but calendar update failed")
         else:
             print(f"✅ Booking {booking.id} rescheduled: Event updated in DB only")
         
@@ -624,7 +697,8 @@ def reschedule_booking_by_id(db: Session, booking_id: int, new_start_time: datet
             "success": True,
             "message": "Booking rescheduled successfully",
             "booking_id": booking.id,
-            "calendar_updated": calendar_updated
+            "calendar_updated": calendar_updated,
+            "slot_created": slot_created
         }
         
     except Exception as e:

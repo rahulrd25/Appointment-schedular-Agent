@@ -1,12 +1,12 @@
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta, timezone, date
+from datetime import datetime, timedelta, timezone
+import pytz
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, or_
 
 from app.models.models import AvailabilitySlot, User, Booking
 from app.schemas.schemas import AvailabilitySlotCreate, AvailabilitySlotUpdate
-from app.core.timezone_utils import TimezoneManager, ensure_utc_datetime, parse_user_datetime
 
 
 def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id: int) -> dict:
@@ -23,48 +23,49 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
                 "google_event_id": None
             }
         
-        # Ensure timezone-aware datetime objects for storage
-        user_timezone = TimezoneManager.get_user_timezone(user.timezone)
-        utc_start_time = ensure_utc_datetime(slot.start_time)
-        utc_end_time = ensure_utc_datetime(slot.end_time)
-        
-        # Check for overlapping slots on the same date with proper timezone handling
+        # Check for overlapping slots on the same date with proper error handling
         try:
-            # Convert to user's timezone for comparison
-            user_start_time = TimezoneManager.convert_from_utc(utc_start_time, user_timezone)
-            user_end_time = TimezoneManager.convert_from_utc(utc_end_time, user_timezone)
+            # Get user's timezone once
+            user_timezone = pytz.timezone(user.timezone or 'UTC')
             
-            # Get the date part for comparison
-            slot_date = user_start_time.date()
+            # Ensure both times are timezone-aware for proper comparison
+            if not slot.start_time.tzinfo:
+                slot_start = user_timezone.localize(slot.start_time)
+                slot_end = user_timezone.localize(slot.end_time)
+            else:
+                slot_start = slot.start_time
+                slot_end = slot.end_time
             
-            # Check for any overlapping slots on the same date
-            # Overlap occurs when:
-            # 1. New slot starts before existing slot ends AND new slot ends after existing slot starts
-            # 2. Or when slots have the same start time
-            existing_overlapping_slot = db.query(AvailabilitySlot).filter(
-                and_(
-                    AvailabilitySlot.user_id == user_id,
-                    func.date(AvailabilitySlot.start_time) == slot_date,
-                    or_(
-                        # Case 1: New slot overlaps with existing slot
-                        and_(
-                            utc_start_time < AvailabilitySlot.end_time,
-                            utc_end_time > AvailabilitySlot.start_time
-                        ),
-                        # Case 2: Same start time
-                        AvailabilitySlot.start_time == utc_start_time
-                    )
-                )
-            ).first()
+            # Get the date part for comparison (in user's timezone)
+            slot_date_local = slot_start.astimezone(user_timezone).date()
+            
+            # Get all slots for this user
+            all_user_slots = db.query(AvailabilitySlot).filter(
+                AvailabilitySlot.user_id == user_id
+            ).all()
+            
+            # Check for overlaps in Python (easier to handle timezones)
+            existing_overlapping_slot = None
+            for existing_slot in all_user_slots:
+                # Convert existing slot times to user's timezone for comparison
+                existing_start_local = existing_slot.start_time.astimezone(user_timezone)
+                existing_end_local = existing_slot.end_time.astimezone(user_timezone)
+                
+                # Check if dates match (in user's timezone)
+                if existing_start_local.date() == slot_date_local:
+                    # Check for overlap
+                    if (slot_start < existing_end_local and slot_end > existing_start_local):
+                        existing_overlapping_slot = existing_slot
+                        break
             
             if existing_overlapping_slot:
-                # Format times in user's timezone for display
-                existing_user_start = TimezoneManager.convert_from_utc(existing_overlapping_slot.start_time, user_timezone)
-                existing_user_end = TimezoneManager.convert_from_utc(existing_overlapping_slot.end_time, user_timezone)
+                # Convert UTC times to user's timezone for display
+                existing_start_local = existing_overlapping_slot.start_time.astimezone(user_timezone)
+                existing_end_local = existing_overlapping_slot.end_time.astimezone(user_timezone)
                 
-                existing_time = existing_user_start.strftime("%I:%M %p")
-                existing_date = existing_user_start.strftime("%B %d, %Y")
-                existing_end_time = existing_user_end.strftime("%I:%M %p")
+                existing_time = existing_start_local.strftime("%I:%M %p")
+                existing_date = existing_start_local.strftime("%B %d, %Y")
+                existing_end_time = existing_end_local.strftime("%I:%M %p")
                 
                 return {
                     "success": False,
@@ -85,7 +86,6 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
             }
         
         # Check if user has Google Calendar connected
-        calendar_service = None
         if user.google_calendar_connected and user.google_access_token and user.google_refresh_token:
             try:
                 # Test calendar connection first
@@ -114,8 +114,8 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
         try:
             db_slot = AvailabilitySlot(
                 user_id=user_id,
-                start_time=utc_start_time,
-                end_time=utc_end_time,
+                start_time=slot.start_time,
+                end_time=slot.end_time,
                 is_available=slot.is_available
             )
             db.add(db_slot)
@@ -137,18 +137,18 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
         google_event_id = None
         
         # Create Google Calendar event if user has connected calendar
-        if calendar_service:
+        if user.google_calendar_connected and user.google_access_token and user.google_refresh_token:
             try:
                 # Create event in Google Calendar
                 event_data = {
                     'summary': 'Available for Booking',
                     'description': 'Time slot available for appointments',
                     'start': {
-                        'dateTime': utc_start_time.isoformat(),
+                        'dateTime': slot.start_time.isoformat(),
                         'timeZone': 'UTC'
                     },
                     'end': {
-                        'dateTime': utc_end_time.isoformat(),
+                        'dateTime': slot.end_time.isoformat(),
                         'timeZone': 'UTC'
                     },
                     'transparency': 'opaque',  # Mark as busy
@@ -161,16 +161,11 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
                 created_event = calendar_service.create_event(event_data)
                 google_event_id = created_event.get('id')
                 
-                # Verify that the event was actually created
-                if not google_event_id:
-                    raise Exception("Failed to create Google Calendar event - no event ID returned")
-                
                 # Update the slot with Google Calendar event ID
                 try:
                     db_slot.google_event_id = google_event_id
                     db.commit()
                     calendar_created = True
-                    print(f"✅ Google Calendar event created successfully: {google_event_id}")
                 except Exception as e:
                     db.rollback()
                     return {
@@ -193,14 +188,6 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
                     "calendar_error": str(e),
                     "google_event_id": None
                 }
-        
-        # Log success if both database and calendar were created
-        if calendar_created and google_event_id:
-            print(f"✅ Slot successfully created in DB and calendar for user {user_id}")
-        elif not calendar_created and google_event_id is None:
-            print(f"⚠️ Slot created in DB only (no calendar connection) for user {user_id}")
-        elif not calendar_created and google_event_id is None:
-            print(f"❌ Slot creation failed for user {user_id}")
         
         return {
             "success": True,
@@ -234,52 +221,40 @@ def get_availability_slots_for_user(db: Session, user_id: int, include_unavailab
 
 def get_available_slots_for_booking(db: Session, user_id: int, from_date: datetime = None) -> List[AvailabilitySlot]:
     """Get available slots that can be booked (not already booked and in the future)."""
-    now = datetime.utcnow()
-    start_filter = from_date if from_date and from_date > now else now
+    from datetime import timezone
+    now = datetime.now(timezone.utc)
+    
+    # If from_date is provided, use it; otherwise use current time
+    if from_date:
+        # If from_date is naive, assume it's in UTC
+        if from_date.tzinfo is None:
+            from_date = from_date.replace(tzinfo=timezone.utc)
+        start_filter = from_date
+    else:
+        start_filter = now
     
     # Get availability slots that are:
     # 1. Available
-    # 2. In the future
+    # 2. For the specific date (if provided) or in the future
     # 3. Not fully booked
-    query = db.query(AvailabilitySlot).filter(
-        and_(
-            AvailabilitySlot.user_id == user_id,
-            AvailabilitySlot.is_available == True,
-            AvailabilitySlot.start_time > start_filter
-        )
-    )
-    
-    # Filter out slots that already have confirmed bookings
-    available_slots = []
-    for slot in query.all():
-        existing_booking = db.query(Booking).filter(
+    if from_date:
+        # For specific date, get slots for that date only
+        query = db.query(AvailabilitySlot).filter(
             and_(
-                Booking.availability_slot_id == slot.id,
-                Booking.status == "confirmed"
+                AvailabilitySlot.user_id == user_id,
+                AvailabilitySlot.is_available == True,
+                func.date(AvailabilitySlot.start_time) == func.date(from_date)
             )
-        ).first()
-        
-        if not existing_booking:
-            available_slots.append(slot)
-    
-    return sorted(available_slots, key=lambda x: x.start_time)
-
-
-def get_available_slots_for_date(db: Session, user_id: int, date: datetime.date) -> List[AvailabilitySlot]:
-    """Get available slots for a specific date."""
-    # Convert date to datetime for comparison
-    start_of_day = datetime.combine(date, datetime.min.time())
-    end_of_day = datetime.combine(date, datetime.max.time())
-    
-    # Get availability slots for the specific date
-    query = db.query(AvailabilitySlot).filter(
-        and_(
-            AvailabilitySlot.user_id == user_id,
-            AvailabilitySlot.is_available == True,
-            AvailabilitySlot.start_time >= start_of_day,
-            AvailabilitySlot.start_time <= end_of_day
         )
-    )
+    else:
+        # For future slots, get all future slots
+        query = db.query(AvailabilitySlot).filter(
+            and_(
+                AvailabilitySlot.user_id == user_id,
+                AvailabilitySlot.is_available == True,
+                AvailabilitySlot.start_time > start_filter
+            )
+        )
     
     # Filter out slots that already have confirmed bookings
     available_slots = []
@@ -328,16 +303,13 @@ def delete_availability_slot(db: Session, slot_id: int, user_id: int) -> dict:
     if not slot:
         return {"success": False, "message": "Slot not found"}
     
-    # Check if there are any confirmed bookings for this slot
+    # Check if there are any bookings for this slot (any status)
     existing_booking = db.query(Booking).filter(
-        and_(
-            Booking.availability_slot_id == slot.id,
-            Booking.status == "confirmed"
-        )
+        Booking.availability_slot_id == slot.id
     ).first()
     
     if existing_booking:
-        return {"success": False, "message": "Cannot delete slot with confirmed bookings"}
+        return {"success": False, "message": f"Cannot delete slot with existing booking (ID: {existing_booking.id}, Status: {existing_booking.status})"}
     
     # Delete from database first
     try:
@@ -473,16 +445,15 @@ def create_availability_slots_from_calendar(db: Session, user: User, start_date:
 
 
 def check_calendar_connection(db: Session, user: User) -> dict:
-    """Check if user's Google Calendar is properly connected and working."""
+    """Check if user's Google Calendar connection is working."""
     try:
-        if not user.google_access_token or not user.google_refresh_token:
+        if not user.google_calendar_connected or not user.google_access_token:
             return {
                 "connected": False,
-                "message": "Google Calendar not connected",
-                "timezone": None
+                "message": "Calendar not connected"
             }
         
-        # Test calendar connection
+        from app.services.google_calendar_service import GoogleCalendarService
         calendar_service = GoogleCalendarService(
             access_token=user.google_access_token,
             refresh_token=user.google_refresh_token,
@@ -490,30 +461,19 @@ def check_calendar_connection(db: Session, user: User) -> dict:
             user_id=user.id
         )
         
-        # Test basic connection
+        # Test connection by getting events
         events = calendar_service.get_events()
-        
-        # Detect timezone from Google Calendar
-        detected_timezone = TimezoneManager.detect_timezone_from_google_calendar(calendar_service)
-        
-        # Update user's timezone if it's different or not set
-        if user.timezone != detected_timezone:
-            user.timezone = detected_timezone
-            db.commit()
-            print(f"✅ Auto-detected timezone: {detected_timezone} for user {user.id}")
         
         return {
             "connected": True,
-            "message": "Google Calendar connected successfully",
-            "timezone": detected_timezone,
-            "timezone_display": TimezoneManager.get_timezone_display_name(detected_timezone)
+            "message": "Calendar connected and working",
+            "event_count": len(events) if events else 0
         }
         
     except Exception as e:
         return {
             "connected": False,
-            "message": f"Calendar connection failed: {str(e)}",
-            "timezone": None
+            "message": f"Calendar connection failed: {str(e)}"
         }
 
 
@@ -529,13 +489,8 @@ class AvailabilityService:
         
         if date:
             # Filter by date - ensure timezone-naive comparison
-            # Convert date to datetime objects for replace() calls
-            if hasattr(date, 'date'):  # Check if it's a datetime object
-                date_start = date.replace(hour=0, minute=0, second=0, microsecond=0)
-                date_end = date.replace(hour=23, minute=59, second=59, microsecond=999999)
-            else:  # It's a date object
-                date_start = datetime.combine(date, datetime.min.time())
-                date_end = datetime.combine(date, datetime.max.time())
+            date_start = date.replace(hour=0, minute=0, second=0, microsecond=0)
+            date_end = date.replace(hour=23, minute=59, second=59, microsecond=999999)
             
             # Convert slots to timezone-naive for comparison
             filtered_slots = []

@@ -54,12 +54,11 @@ class AdvancedAIAgentService:
         self.db = db
         self.conversation_contexts: Dict[str, Dict] = {}
         
-        # Load appointment examples for learning
-        from app.services.appointment_examples import AppointmentExamples
-        self.examples = AppointmentExamples.get_conversation_examples()
-        self.entity_patterns = AppointmentExamples.get_entity_patterns()
-        self.context_rules = AppointmentExamples.get_context_rules()
-        self.action_patterns = AppointmentExamples.get_action_patterns()
+        # Load appointment examples for learning (inline data)
+        self.examples = self._get_conversation_examples()
+        self.entity_patterns = self._get_entity_patterns()
+        self.context_rules = self._get_context_rules()
+        self.action_patterns = self._get_action_patterns()
         
         # Knowledge base for different domains
         self.knowledge_base = {
@@ -1120,45 +1119,100 @@ class AdvancedAIAgentService:
             )
     
     def _handle_general_query(self, extracted_info: ExtractedInfo, context: Dict) -> AgentResponse:
-        """
-        Handle general queries and provide helpful information
-        """
-        # Check if this is a negative response to a previous question
-        message_lower = context.get("user_message", "").lower()
-        negative_words = ["no", "not", "never", "don't", "doesn't", "won't", "cancel", "stop"]
-        
-        if any(word in message_lower for word in negative_words):
-            # This is likely a negative response
-            context_history = context.get("conversation_history", [])
-            if context_history:
-                last_response = context_history[-1].get("agent_response", {})
-                if "?" in last_response.get("message", ""):
-                    # User said no to a question, offer alternatives
-                    return AgentResponse(
-                        message="No problem! What would you like to do instead?",
-                        action_taken="negative_response",
-                        suggestions=[
-                            "Schedule a meeting",
-                            "Check my availability", 
-                            "Show my calendar",
-                            "Get scheduling tips"
-                        ],
-                        data={},
-                        confidence=0.7,
-                        requires_confirmation=False
-                    )
-        
-        # Regular general query
-        return AgentResponse(
-            message="I'm here to help you manage your calendar and schedule meetings. What would you like to do?",
-            action_taken="general_help",
+        """Handle general queries about the system"""
+        response = AgentResponse(
+            message="I'm here to help you with scheduling! I can help you book meetings, check availability, reschedule, or cancel appointments. What would you like to do?",
+            action_taken=None,
             suggestions=[
                 "Schedule a meeting",
-                "Check my availability",
-                "Show my calendar",
-                "Get scheduling tips"
+                "Check my availability", 
+                "Reschedule an appointment",
+                "Cancel a meeting"
             ],
             data={},
-            confidence=extracted_info.confidence,
+            confidence=0.8,
             requires_confirmation=False
-        ) 
+        )
+        return response
+    
+    def _get_conversation_examples(self) -> List[Dict]:
+        """Get conversation examples for learning"""
+        return [
+            {
+                "user_message": "I need to schedule a meeting with John tomorrow",
+                "intent": IntentType.SCHEDULE_MEETING,
+                "entities": {"person": "John", "time": "tomorrow"},
+                "response": "I'll help you schedule a meeting with John tomorrow. What time works best for you?",
+                "action": "schedule_meeting"
+            },
+            {
+                "user_message": "When am I free this week?",
+                "intent": IntentType.CHECK_AVAILABILITY,
+                "entities": {"time": "this week"},
+                "response": "Let me check your availability for this week. Here are your free time slots:",
+                "action": "check_availability"
+            },
+            {
+                "user_message": "Can we reschedule our meeting to Friday?",
+                "intent": IntentType.RESCHEDULE,
+                "entities": {"time": "Friday"},
+                "response": "I'll help you reschedule the meeting to Friday. What time works best?",
+                "action": "reschedule_meeting"
+            }
+        ]
+    
+    def _get_entity_patterns(self) -> Dict[str, List[str]]:
+        """Get entity extraction patterns"""
+        return {
+            "person": [
+                r"(with|meet)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",
+                r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(meeting|call)"
+            ],
+            "time": [
+                r"(tomorrow|today|next\s+week|this\s+week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)",
+                r"(\d{1,2}:\d{2}\s*(?:am|pm)?)",
+                r"(\d{1,2}\s*(?:am|pm))"
+            ],
+            "duration": [
+                r"(\d+)\s*(?:min|minute|hour|hr)",
+                r"(half\s+hour|hour|30\s+min|60\s+min)"
+            ],
+            "topic": [
+                r"(about|regarding|concerning)\s+([^,\.]+)",
+                r"(discuss|talk\s+about)\s+([^,\.]+)"
+            ]
+        }
+    
+    def _get_context_rules(self) -> Dict[str, Any]:
+        """Get context analysis rules"""
+        return {
+            "urgency_indicators": ["urgent", "asap", "immediately", "right away"],
+            "confirmation_indicators": ["yes", "confirm", "okay", "sure"],
+            "cancellation_indicators": ["no", "cancel", "never mind", "forget it"],
+            "time_preferences": ["morning", "afternoon", "evening", "business hours"]
+        }
+    
+    def _get_action_patterns(self) -> Dict[str, List[str]]:
+        """Get action patterns for different intents"""
+        return {
+            IntentType.SCHEDULE_MEETING: [
+                "schedule_meeting",
+                "create_booking", 
+                "book_slot"
+            ],
+            IntentType.CHECK_AVAILABILITY: [
+                "check_availability",
+                "show_slots",
+                "get_free_times"
+            ],
+            IntentType.RESCHEDULE: [
+                "reschedule_meeting",
+                "update_booking",
+                "change_time"
+            ],
+            IntentType.CANCEL: [
+                "cancel_meeting",
+                "delete_booking",
+                "remove_slot"
+            ]
+        } 

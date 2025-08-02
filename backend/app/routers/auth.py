@@ -12,51 +12,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.get("/login")
-async def login_get(request: Request):
-    """Login page - using index.html as landing page"""
-    return templates.TemplateResponse("index.html", {"request": request})
 
-
-@router.post("/login")
-async def login_post(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-    db: Session = Depends(get_db)
-):
-    """Handle login form submission"""
-    try:
-        user = authenticate_user(db, email, password)
-        if not user:
-            return templates.TemplateResponse("index.html", {
-                "request": request,
-                "error": "Invalid email or password"
-            })
-        
-        # Create access token
-        access_token = create_access_token(data={"sub": user.email})
-        
-        # Create response with redirect
-        response = RedirectResponse(url="/dashboard", status_code=302)
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=True,
-            max_age=86400,  # 24 hours (1440 minutes * 60 seconds)
-            samesite="lax",
-            secure=False,  # Set to True in production with HTTPS
-            path="/"  # Make cookie available across all paths
-        )
-        
-        return response
-        
-    except Exception as e:
-        print(f"Login error: {e}")
-        return templates.TemplateResponse("index.html", {
-            "request": request,
-            "error": "An error occurred during login"
-        })
 
 
 @router.get("/register")
@@ -110,7 +66,6 @@ async def register_post(
         return response
         
     except Exception as e:
-        print(f"Registration error: {e}")
         return templates.TemplateResponse("register.html", {
             "request": request,
             "error": "An error occurred during registration"
@@ -151,7 +106,6 @@ async def verify_email(request: Request, token: str, db: Session = Depends(get_d
         })
         
     except Exception as e:
-        print(f"Email verification error: {e}")
         return templates.TemplateResponse("verify_email.html", {
             "request": request,
             "success": False,
@@ -210,7 +164,6 @@ async def connect_email(
         return response
         
     except Exception as e:
-        print(f"Connect email error: {e}")
         return templates.TemplateResponse("index.html", {
             "request": request,
             "error": "An error occurred during login"
@@ -220,6 +173,6 @@ async def connect_email(
 @router.get("/logout")
 async def logout():
     """Logout user"""
-    response = RedirectResponse(url="/login", status_code=302)
+    response = RedirectResponse(url="/", status_code=302)
     response.delete_cookie("access_token")
     return response 

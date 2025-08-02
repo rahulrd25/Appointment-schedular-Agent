@@ -430,5 +430,22 @@
             document.getElementById('booking-modal').classList.add('hidden');
         }
     });
+
+    // Booking action functions
+    function showBookingDetails(bookingId) {
+        htmx.ajax('GET', `/bookings/api/${bookingId}/details`, '#booking-modal');
+    }
+
+    function showRescheduleForm(bookingId) {
+        htmx.ajax('GET', `/bookings/api/${bookingId}/reschedule-form`, '#booking-modal');
+    }
+
+    function showCancelConfirmation(bookingId) {
+        htmx.ajax('GET', `/bookings/api/${bookingId}/cancel-confirmation`, '#booking-modal');
+    }
+
+    function showSendEmailForm(bookingId) {
+        htmx.ajax('GET', `/bookings/api/${bookingId}/send-email-form`, '#booking-modal');
+    }
 </script>
 {% endblock %} 

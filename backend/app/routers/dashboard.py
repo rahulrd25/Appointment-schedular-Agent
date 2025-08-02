@@ -15,24 +15,26 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
+
+
 @router.get("/dashboard")
 async def dashboard(request: Request, db: Session = Depends(get_db)):
     """Dashboard Interface"""
     access_token = request.cookies.get("access_token")
 
     if not access_token:
-        return RedirectResponse(url="/login", status_code=302)
+        return RedirectResponse(url="/", status_code=302)
 
     try:
         payload = verify_token(access_token)
         if not payload:
-            return RedirectResponse(url="/login", status_code=302)
+            return RedirectResponse(url="/", status_code=302)
 
         user_email = payload.get("sub")
         user = get_user_by_email(db, user_email)
 
         if not user:
-            return RedirectResponse(url="/login", status_code=302)
+            return RedirectResponse(url="/", status_code=302)
 
         return templates.TemplateResponse("dashboard.html", {
             "request": request,
@@ -41,7 +43,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
 
     except Exception as e:
         print(f"Dashboard error: {e}")
-        return RedirectResponse(url="/login", status_code=302)
+        return RedirectResponse(url="/", status_code=302)
 
 
 @router.get("/dashboard/api/bookings/upcoming")
@@ -335,6 +337,79 @@ async def refresh_calendar_tokens_endpoint(request: Request, db: Session = Depen
         return {"error": str(e)}
 
 
+@router.post("/dashboard/api/sync-calendar")
+async def sync_calendar_endpoint(request: Request, db: Session = Depends(get_db)):
+    """Sync calendar events to database"""
+    print("🔄 SYNC START: Calendar sync endpoint called")
+    
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        print("❌ SYNC ERROR: No access token")
+        return {"success": False, "error": "Not authenticated"}
+    
+    try:
+        print("🔍 SYNC STEP 1: Verifying token...")
+        payload = verify_token(access_token)
+        if not payload:
+            print("❌ SYNC ERROR: Invalid token")
+            return {"success": False, "error": "Invalid token"}
+        
+        user_email = payload.get("sub")
+        print(f"👤 SYNC STEP 2: Getting user for email: {user_email}")
+        user = get_user_by_email(db, user_email)
+        
+        if not user:
+            print("❌ SYNC ERROR: User not found")
+            return {"success": False, "error": "User not found"}
+        
+        print(f"✅ SYNC STEP 3: User found - ID: {user.id}, Calendar connected: {user.google_calendar_connected}")
+        
+        if not user.google_access_token or not user.google_refresh_token:
+            print("❌ SYNC ERROR: Calendar not connected - missing tokens")
+            return {"success": False, "error": "Calendar not connected"}
+        
+        print("🔗 SYNC STEP 4: Calendar tokens found, initializing sync service...")
+        
+        # Import and use the background sync service
+        from app.services.sync.background_sync import BackgroundSyncService
+        sync_service = BackgroundSyncService()
+        
+        print("🚀 SYNC STEP 5: Starting calendar to database sync...")
+        
+        # Perform calendar to database sync
+        import asyncio
+        try:
+            sync_result = await sync_service.sync_calendar_to_database(db, user.id)
+            print(f"📊 SYNC STEP 6: Sync completed - Result: {sync_result}")
+        except Exception as e:
+            print(f"❌ SYNC ERROR: Exception during sync: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Sync failed: {str(e)}"
+            }
+        
+        if not sync_result.get("success"):
+            print(f"❌ SYNC ERROR: Sync returned failure: {sync_result}")
+            return {
+                "success": False, 
+                "error": sync_result.get("error", "Unknown sync error")
+            }
+        
+        print(f"✅ SYNC SUCCESS: Events created: {sync_result.get('events_created', 0)}, Updated: {sync_result.get('events_updated', 0)}, Total: {sync_result.get('total_events_processed', 0)}")
+        
+        return {
+            "success": True,
+            "message": "Calendar synced successfully",
+            "events_created": sync_result.get("events_created", 0),
+            "events_updated": sync_result.get("events_updated", 0),
+            "total_events_processed": sync_result.get("total_events_processed", 0)
+        }
+        
+    except Exception as e:
+        print(f"❌ SYNC ERROR: Unexpected error in sync_calendar_endpoint: {e}")
+        return {"success": False, "error": str(e)}
+
+
 @router.post("/dashboard/api/chat")
 async def chat_with_ai(request: Request, db: Session = Depends(get_db)):
     """Chat with AI agent"""
@@ -353,18 +428,30 @@ async def chat_with_ai(request: Request, db: Session = Depends(get_db)):
         if not user:
             return {"error": "User not found"}
         
-        # Get form data
-        form_data = await request.form()
-        message = form_data.get("message", "")
+        # Get JSON data
+        body = await request.json()
+        message = body.get("message", "")
         
         if not message:
             return {"error": "No message provided"}
         
-        # TODO: Implement AI chat functionality
-        # For now, return a simple response
+        # Initialize AI agent service
+        from app.services.agent.intelligent_agent_service import IntelligentAgentService
+        agent_service = IntelligentAgentService(db)
+        
+        # Process message with AI agent
+        result = await agent_service.process_message(
+            user_id=user.id,
+            message=message
+        )
+        
+        # Extract response from AI agent
+        ai_response = result.get("message", "I'm here to help with your scheduling needs!")
+        
         return {
-            "response": f"AI Agent: I received your message: '{message}'. This feature is under development.",
-            "success": True
+            "response": ai_response,
+            "success": True,
+            "data": result
         }
         
     except Exception as e:
