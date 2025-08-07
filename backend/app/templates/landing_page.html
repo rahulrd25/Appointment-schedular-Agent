@@ -1,0 +1,472 @@
+{% extends "base.html" %}
+
+{% block title %}SmartCal - Your Intelligent Scheduling Assistant{% endblock %}
+
+{% block head %}
+<style>
+    html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 80px;
+    }
+    
+    body {
+        background-color: #ffffff;
+    }
+    
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+    }
+    
+    .animate-float {
+        animation: float 6s ease-in-out infinite;
+    }
+    
+    @keyframes fade-in {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+    }
+    
+    .animate-fade-in {
+        animation: fade-in 0.5s ease-out;
+    }
+</style>
+
+<script>
+    // Smooth scrolling for navigation links
+    document.addEventListener('DOMContentLoaded', function() {
+        const navLinks = document.querySelectorAll('a[href^="#"]');
+        
+        navLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                const targetId = this.getAttribute('href');
+                const targetElement = document.querySelector(targetId);
+                
+                if (targetElement) {
+                    const headerHeight = 80; // Account for sticky header
+                    const targetPosition = targetElement.offsetTop - headerHeight;
+                    
+                    window.scrollTo({
+                        top: targetPosition,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+
+
+  <!-- Navigation -->
+  <nav class="relative bg-[#1e3c72] !important backdrop-blur-lg shadow-sm border-b border-[#1e3c72]/50 sticky top-0" style="z-index: 1000; background-color: #1e3c72 !important;">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-20">
+        <div class="flex items-center">
+          <div class="flex items-center space-x-3">
+            <div class="w-12 h-12 flex items-center justify-center">
+              <img src="/static/images/smartcal-logo.png" alt="SmartCal Logo" class="w-12 h-12 object-contain">
+            </div>
+            <h1 class="text-2xl font-bold text-white">SmartCal</h1>
+          </div>
+        </div>
+        <div class="hidden md:flex items-center space-x-8">
+          <a href="#features" class="font-bold px-4 py-2 rounded-lg cursor-pointer text-white border border-white/30 hover:border-white hover:bg-white hover:text-[#1e3c72] transition-all duration-300 transform hover:scale-105">Features</a>
+          <a href="#how-it-works" class="font-bold px-4 py-2 rounded-lg cursor-pointer text-white border border-white/30 hover:border-white hover:bg-white hover:text-[#1e3c72] transition-all duration-300 transform hover:scale-105">How it works</a>
+          <a href="/api/v1/auth/google" class="font-bold px-4 py-2 rounded-lg cursor-pointer text-white border border-white/30 hover:border-white hover:bg-white hover:text-[#1e3c72] transition-all duration-300 transform hover:scale-105">Connect</a>
+        </div>
+        <div class="md:hidden">
+          <button class="text-white" onmouseover="this.style.color='#2a5298'" onmouseout="this.style.color='white'">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="relative z-10 py-4 lg:py-6 pb-0 bg-white">
+    <div class="max-w-6xl mx-auto px-4">
+              <div class="grid lg:grid-cols-2 gap-20 lg:gap-24 items-stretch min-h-[800px] justify-center">
+        <!-- Left Side - Content -->
+        <div class="space-y-6 mt-16 pb-0 relative">
+          <div class="space-y-4 mt-8" style="position: relative; top: 50px;">
+            <h2 class="text-5xl lg:text-6xl font-bold leading-tight" style="color: #1e3c72;">
+              <div class="whitespace-nowrap">SmartCal Handles</div>
+              <div class="whitespace-nowrap">Booking & Scheduling</div>
+            </h2>
+            <h1 class="text-4xl lg:text-5xl font-bold leading-tight" style="color: #1e3c72;">
+              <div><span style="color: #1e3c72;">All Through Chat.</span></div>
+            </h1>
+            <p class="text-sm lg:text-base leading-relaxed mt-16" style="color: #2a5298;">
+              Connect your calendar and chat with SmartCal. It will book, move, or cancel meetings for you, check when you're free, and keep your schedule neat—no forms or hassle.
+            </p>
+          </div>
+          
+          <!-- CTA Buttons -->
+          <div class="flex flex-col sm:flex-row gap-4 mt-32" style="position: relative; top: 100px;">
+            <a href="/api/v1/auth/google" class="inline-flex items-center justify-center px-8 py-4 text-white font-semibold text-base rounded-lg shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-300 mt-4" style="background: #1e3c72;" onmouseover="this.style.background='#2a5298'" onmouseout="this.style.background='#1e3c72'">
+              <svg class="w-5 h-5 mr-3" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Connect with Google
+            </a>
+            <button onclick="showEmailForm()" class="inline-flex items-center justify-center px-8 py-4 text-white font-semibold text-base rounded-lg shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-300 mt-4" style="background: #1e3c72;" onmouseover="this.style.background='#2a5298'" onmouseout="this.style.background='#1e3c72'">
+              <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+              </svg>
+              Connect with Email
+            </button>
+          </div>
+        </div>
+
+        <!-- Right Side - AI Demo -->
+        <div class="relative flex justify-center lg:justify-end lg:mr-0 mt-8 pb-0 mb-0">
+                      <div class="relative w-full max-w-md md:w-80 h-[600px] overflow-y-auto flex flex-col overflow-hidden group rounded-3xl shadow-2xl mx-auto mb-0">
+            <!-- Gradient Border -->
+            
+            <div class="relative rounded-3xl shadow-2xl border border-[#1e3c72] h-full flex flex-col overflow-hidden" style="background: #1e3c72;">
+              <!-- Header -->
+              <div class="flex items-center gap-3 px-6 py-4 border-b border-white/20" style="background: #2a5298;">
+                <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg">
+                  <svg class="w-5 h-5" style="color: #1e3c72;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h2 class="text-lg font-bold text-white leading-tight">SmartCal</h2>
+                  <p class="text-xs text-white/80">Your personal scheduling assistant</p>
+                </div>
+              </div>
+              <!-- Chat Area -->
+              <div class="flex-1 flex flex-col gap-8 px-6 py-6 overflow-y-auto" style="background: #1e3c72; padding-top: 40px;">
+                <!-- Welcome Message -->
+                <div class="flex justify-start animate-fade-in">
+                  <div class="max-w-lg">
+                    <div class="flex items-end space-x-2">
+                      <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                        <svg class="w-4 h-4" style="color: #1e3c72;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                      </div>
+                      <div class="bg-white text-gray-800 px-3 py-2 rounded-xl rounded-bl-md shadow-lg border border-gray-200">
+                        <p class="text-gray-800 leading-relaxed text-sm">👋 Hi! I'm <span class="font-bold">SmartCal</span>. What can I help you with today?</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Typing Indicator -->
+                <div class="flex justify-start">
+                  <div class="max-w-lg">
+                    <div class="flex items-end space-x-2">
+                      <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                        <svg class="w-4 h-4" style="color: #1e3c72;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" />
+                        </svg>
+                      </div>
+                      <div class="bg-white text-gray-800 px-3 py-2 rounded-xl rounded-bl-md shadow-lg border border-gray-200 flex items-center gap-2">
+                        <span class="block w-1.5 h-1.5 bg-rose-400 rounded-full animate-bounce"></span>
+                        <span class="block w-1.5 h-1.5 bg-pink-400 rounded-full animate-bounce delay-150"></span>
+                        <span class="block w-1.5 h-1.5 bg-rose-400 rounded-full animate-bounce delay-300"></span>
+                        <span class="ml-1 text-xs text-gray-500">typing...</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- User Message -->
+                <div class="flex justify-end animate-fade-in">
+                  <div class="max-w-lg">
+                    <div class="flex items-end space-x-2 flex-row-reverse space-x-reverse">
+                      <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                        <svg class="w-4 h-4" style="color: #1e3c72;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                      </div>
+                      <div class="bg-white text-gray-800 px-3 py-2 rounded-xl rounded-br-md shadow-lg border border-gray-200">
+                        <p class="text-gray-800 leading-relaxed text-sm">I need to schedule a meeting with John tomorrow at 2pm</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- AI Response -->
+                <div class="flex justify-start animate-fade-in">
+                  <div class="max-w-lg">
+                    <div class="flex items-end space-x-2">
+                      <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                        <svg class="w-4 h-4" style="color: #1e3c72;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                      </div>
+                      <div class="bg-white text-gray-800 px-3 py-2 rounded-xl rounded-bl-md shadow-lg border border-gray-200">
+                        <p class="text-gray-800 leading-relaxed text-sm">
+                          <span class="text-green-600 font-semibold">✅ Meeting scheduled!</span> Your meeting with John is set for tomorrow at 2pm.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- CTA Button -->
+                <div class="flex justify-center mt-6">
+                  <a href="/api/v1/auth/google" class="inline-flex items-center space-x-2 rounded-xl px-6 py-3 text-sm text-white font-semibold shadow-lg hover:scale-105 transition-all duration-300" style="background: #1e3c72; border: 2px solid white;" onmouseover="this.style.background='#2a5298'" onmouseout="this.style.background='#1e3c72'">
+                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    <span>Try SmartCal Now</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+    <!-- Features Anchor -->
+  <div id="features" class="h-0"></div>
+
+    <!-- Features Section -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 bg-white">
+    <div id="features" class="p-14 min-h-[550px]">
+      <div class="text-center mb-14">
+        <h2 class="text-4xl font-bold mb-4 group-hover:scale-105 transition-transform duration-300" style="color: #1e3c72;">Why SmartCal?</h2>
+        <p class="text-xl max-w-3xl mx-auto mb-16 group-hover:text-blue-700 transition-colors duration-300" style="color: #2a5298;">See what makes us different</p>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div class="text-center group/item hover:scale-105 transition-all duration-300 cursor-pointer">
+          <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-6 shadow-lg group-hover/item:shadow-2xl group-hover/item:scale-110 group-hover/item:rotate-3 transition-all duration-300">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+          </div>
+          <h3 class="text-xl font-bold mb-3 group-hover/item:text-blue-600 transition-colors duration-300" style="color: #1e3c72;">Natural Conversations</h3>
+          <p class="group-hover/item:text-blue-700 transition-colors duration-300 leading-relaxed text-sm max-w-xs mx-auto" style="color: #2a5298;">Chat naturally with SmartCal. No forms,<br>no complexity - just tell it what you need.</p>
+        </div>
+
+        <div class="text-center group/item hover:scale-105 transition-all duration-300 cursor-pointer">
+          <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-6 shadow-lg group-hover/item:shadow-2xl group-hover/item:scale-110 group-hover/item:rotate-3 transition-all duration-300">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          </div>
+          <h3 class="text-xl font-bold mb-3 group-hover/item:text-green-600 transition-colors duration-300" style="color: #1e3c72;">Smart Availability</h3>
+          <p class="group-hover/item:text-green-700 transition-colors duration-300 leading-relaxed text-sm max-w-xs mx-auto" style="color: #2a5298;">SmartCal learns your preferences and suggests<br>optimal times, automatically handling conflicts.</p>
+        </div>
+
+        <div class="text-center group/item hover:scale-105 transition-all duration-300 cursor-pointer">
+          <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-6 shadow-lg group-hover/item:shadow-2xl group-hover/item:scale-110 group-hover/item:rotate-3 transition-all duration-300">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+          </div>
+          <h3 class="text-xl font-bold mb-3 group-hover/item:text-purple-600 transition-colors duration-300" style="color: #1e3c72;">Calendar Sync</h3>
+          <p class="group-hover/item:text-purple-700 transition-colors duration-300 leading-relaxed text-sm max-w-xs mx-auto" style="color: #2a5298;">Seamlessly integrates with Google Calendar,<br>Outlook, and other popular platforms.</p>
+        </div>
+
+        <div class="text-center group/item hover:scale-105 transition-all duration-300 cursor-pointer">
+          <div class="w-16 h-16 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-6 shadow-lg group-hover/item:shadow-2xl group-hover/item:scale-110 group-hover/item:rotate-3 transition-all duration-300">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+          </div>
+          <h3 class="text-xl font-bold mb-3 group-hover/item:text-yellow-600 transition-colors duration-300" style="color: #1e3c72;">Auto Reminders</h3>
+          <p class="group-hover/item:text-yellow-700 transition-colors duration-300 leading-relaxed text-sm max-w-xs mx-auto" style="color: #2a5298;">Automatic email confirmations and reminders<br>keep everyone informed and on time.</p>
+        </div>
+
+        <div class="text-center group/item hover:scale-105 transition-all duration-300 cursor-pointer">
+          <div class="w-16 h-16 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-6 shadow-lg group-hover/item:shadow-2xl group-hover/item:scale-110 group-hover/item:rotate-3 transition-all duration-300">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          </div>
+          <h3 class="text-xl font-bold mb-3 group-hover/item:text-indigo-600 transition-colors duration-300" style="color: #1e3c72;">24/7 Availability</h3>
+          <p class="group-hover/item:text-indigo-700 transition-colors duration-300 leading-relaxed text-sm max-w-xs mx-auto" style="color: #2a5298;">SmartCal works around the clock, handling<br>requests even when you're unavailable.</p>
+        </div>
+
+        <div class="text-center group/item hover:scale-105 transition-all duration-300 cursor-pointer">
+          <div class="w-16 h-16 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-6 shadow-lg group-hover/item:shadow-2xl group-hover/item:scale-110 group-hover/item:rotate-3 transition-all duration-300">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+          </div>
+          <h3 class="text-xl font-bold mb-3 group-hover/item:text-indigo-600 transition-colors duration-300" style="color: #1e3c72;">Analytics & Insights</h3>
+          <p class="group-hover/item:text-indigo-700 transition-colors duration-300 leading-relaxed text-sm max-w-xs mx-auto" style="color: #2a5298;">Get insights into your scheduling patterns<br>and optimize your time management.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spacer for additional gap -->
+  <div style="height: 30px;"></div>
+
+  <!-- How AI Scheduler Works Section -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 bg-white">
+    <div id="how-it-works" class="p-14 min-h-[750px]">
+      <div class="text-center mb-14">
+        <h2 class="text-4xl font-bold mb-4 group-hover:scale-105 transition-transform duration-300" style="color: #1e3c72;">SmartCal's Magic in Action</h2>
+        <p class="text-xl max-w-3xl mx-auto mb-16 group-hover:text-blue-700 transition-colors duration-300" style="color: #2a5298;">Get started in minutes with our simple 4-step process</p>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div class="text-center group/item hover:scale-105 transition-all duration-300 cursor-pointer">
+          <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-6 shadow-lg group-hover/item:shadow-2xl group-hover/item:scale-110 group-hover/item:rotate-3 transition-all duration-300">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-bold mb-3 group-hover/item:text-blue-600 transition-colors duration-300" style="color: #1e3c72;">Connect</h3>
+          <p class="group-hover/item:text-blue-700 transition-colors duration-300" style="color: #2a5298;">Connect your calendar with Google or email authentication</p>
+        </div>
+        
+        <div class="text-center group/item hover:scale-105 transition-all duration-300 cursor-pointer">
+          <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-6 shadow-lg group-hover/item:shadow-2xl group-hover/item:scale-110 group-hover/item:rotate-3 transition-all duration-300">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-bold mb-3 group-hover/item:text-green-600 transition-colors duration-300" style="color: #1e3c72;">Chat</h3>
+          <p class="group-hover/item:text-green-700 transition-colors duration-300" style="color: #2a5298;">Start a conversation with your AI scheduler</p>
+        </div>
+        
+        <div class="text-center group/item hover:scale-105 transition-all duration-300 cursor-pointer">
+          <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-6 shadow-lg group-hover/item:shadow-2xl group-hover/item:scale-110 group-hover/item:rotate-3 transition-all duration-300">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-bold mb-3 group-hover/item:text-purple-600 transition-colors duration-300" style="color: #1e3c72;">Schedule</h3>
+          <p class="group-hover/item:text-purple-700 transition-colors duration-300" style="color: #2a5298;">AI handles the scheduling and sends confirmations</p>
+        </div>
+        
+        <div class="text-center group/item hover:scale-105 transition-all duration-300 cursor-pointer">
+          <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-6 shadow-lg group-hover/item:shadow-2xl group-hover/item:scale-110 group-hover/item:rotate-3 transition-all duration-300">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-bold mb-3 group-hover/item:text-green-600 transition-colors duration-300" style="color: #1e3c72;">Done</h3>
+          <p class="group-hover/item:text-green-700 transition-colors duration-300" style="color: #2a5298;">Your calendar is updated and everyone is notified</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spacer -->
+  <div style="height: 40px;"></div>
+
+    <!-- Footer -->
+  <footer class="bg-[#1e3c72] py-8 border-t border-[#1e3c72]/50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <!-- Newsletter Signup -->
+      <div class="text-center mb-6">
+        <h4 class="text-lg font-semibold text-white mb-2">Stay updated with SmartCal</h4>
+        <p class="text-white/80 text-sm mb-4">Get the latest updates and tips for better scheduling</p>
+        <div class="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+          <input 
+            type="email" 
+            placeholder="Enter your email" 
+            class="flex-1 px-4 py-2 border border-white/30 rounded-lg focus:ring-2 focus:ring-white focus:border-white bg-white/10 text-white placeholder-white/60"
+          />
+          <button class="px-6 py-2 bg-white text-[#1e3c72] rounded-lg hover:bg-white/90 transition-colors font-semibold">
+            Subscribe
+          </button>
+        </div>
+      </div>
+
+      <!-- Copyright -->
+      <div class="text-center">
+        <p class="text-white text-sm">© 2024 SmartCal. A Vaatify product.</p>
+      </div>
+    </div>
+  </footer>
+
+<!-- Email Form Modal (Hidden by default) -->
+<div id="email-form-container" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-2xl p-8 border border-gray-200 shadow-xl max-w-md mx-4">
+    <div class="text-center mb-6">
+      <h3 class="text-2xl font-bold text-gray-900 mb-2">Connect with Email</h3>
+      <p class="text-gray-600">Enter your email to get started</p>
+    </div>
+    
+    <form id="email-form" hx-post="/connect-email" hx-target="#email-response" hx-swap="innerHTML" class="space-y-4">
+      <div>
+        <input 
+          type="email" 
+          name="email" 
+          required 
+          class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors text-base"
+          placeholder="Enter your email address"
+        />
+      </div>
+      
+      <button 
+        type="submit" 
+        class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-3 px-4 rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+      >
+        Start Scheduling
+      </button>
+    </form>
+    
+    <div id="email-response" class="mt-4 text-center"></div>
+    
+    <button onclick="hideEmailForm()" class="w-full mt-4 text-gray-600 hover:text-gray-800 font-medium">
+      ← Back to options
+    </button>
+  </div>
+</div>
+
+<script>
+function showEmailForm() {
+  document.getElementById('email-form-container').classList.remove('hidden');
+}
+
+function hideEmailForm() {
+  document.getElementById('email-form-container').classList.add('hidden');
+}
+
+// Handle successful connection redirects
+document.addEventListener('htmx:afterRequest', function(event) {
+  if (event.detail.xhr.status === 200) {
+    const response = event.detail.xhr.responseText;
+    if (response.includes('redirect') || response.includes('dashboard')) {
+      window.location.href = '/dashboard';
+    }
+  }
+});
+
+// Smooth scrolling for anchor links
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+  anchor.addEventListener('click', function (e) {
+    e.preventDefault();
+    const target = document.querySelector(this.getAttribute('href'));
+    if (target) {
+      target.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  });
+});
+</script>
+{% endblock %}
+
+<style>
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+  opacity: 0;
+}
+</style>
+</style>
