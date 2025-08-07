@@ -1236,11 +1236,7 @@ function deleteIndividualSlot(slotId, buttonElement, event) {
         event.stopImmediatePropagation();
     }
     
-    console.log('=== INDIVIDUAL DELETE FUNCTION CALLED ===');
-    console.log('Individual delete called for slot:', slotId);
-    console.log('Making DELETE request to:', '/api/v1/availability/' + slotId);
-    console.log('Button element:', buttonElement);
-    console.log('Event:', event);
+
     
 
     
@@ -1376,30 +1372,20 @@ document.body.addEventListener('htmx:afterOnLoad', function(evt) {
         const response = evt.detail.xhr.responseText;
         const status = evt.detail.xhr.status;
         
-        console.log('HTMX Response for target:', targetId, 'Status:', status, 'Response:', response);
-        
         // Handle any successful response for availability-list
         if (targetId === 'availability-list' && status === 200) {
-            console.log('HTMX response received for availability-list');
-            console.log('Response content:', response);
-            
             // Always reload the page after successful slot creation
-            console.log('Reloading page to show new slot');
             
             // Reset the form
             const form = document.querySelector('form[hx-post="/dashboard/api/availability/"]');
             if (form) {
                 form.reset();
-                console.log('Form reset successfully');
             }
             
             // Wait 1 second, then reload the page
             setTimeout(() => {
-                console.log('Executing page reload');
                 location.reload();
             }, 1000);
-        } else {
-            console.log('Not handling this response - target:', targetId, 'status:', status);
         }
     } catch (error) {
         console.error('Error handling HTMX response:', error);
@@ -1841,10 +1827,9 @@ function applyQuickAvailability() {
     
     // Prevent multiple submissions
     const button = event.target;
-    if (button.disabled) {
-        console.log('Button already disabled, preventing multiple submissions');
-        return;
-    }
+            if (button.disabled) {
+            return;
+        }
     
     // Show loading state
     const originalText = button.innerHTML;
@@ -1882,8 +1867,6 @@ function applyQuickAvailability() {
         });
     });
     
-    console.log(`Creating ${slots.length} availability slots...`);
-    
     // Send request to create slots
     fetch('/dashboard/api/availability/quick', {
         method: 'POST',
@@ -1895,11 +1878,9 @@ function applyQuickAvailability() {
         })
     })
     .then(response => {
-        console.log('Response status:', response.status);
         return response.json();
     })
     .then(data => {
-        console.log('Response data:', data);
         if (data.success) {
             showNotification(`Successfully created ${data.slots_created} availability slots!`, 'success');
             // Reload page to show new slots

@@ -88,6 +88,13 @@ def update_slot(
     return slot
 
 
+@router.delete("/{slot_id}")
+def delete_slot(
+    slot_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Delete an availability slot."""
     result = delete_availability_slot(db=db, slot_id=slot_id, user_id=current_user.id)
     
     if not result["success"]:
@@ -96,4 +103,24 @@ def update_slot(
             detail=result["message"]
         )
     
-    return result 
+    return result
+
+
+@router.delete("/bulk-delete")
+def bulk_delete_slots(
+    slot_ids: List[int],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Delete multiple availability slots."""
+    deleted_count = 0
+    for slot_id in slot_ids:
+        result = delete_availability_slot(db=db, slot_id=slot_id, user_id=current_user.id)
+        if result["success"]:
+            deleted_count += 1
+    
+    return {
+        "success": True,
+        "deleted_count": deleted_count,
+        "message": f"Successfully deleted {deleted_count} slots"
+    } 

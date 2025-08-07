@@ -5,6 +5,7 @@ import json
 
 from app.core.database import get_db
 from app.services.intelligent_agent_service import IntelligentAgentService
+from app.services.google_calendar_service import GoogleCalendarService
 from app.api.deps import get_current_user_from_cookie
 from app.models.models import User
 
@@ -48,6 +49,25 @@ async def get_calendar_events(
     except Exception as e:
         # Return empty events if there's an error
         return {"events": []}
+
+@router.get("/stats")
+async def get_user_stats_endpoint(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_from_cookie)
+):
+    """
+    Get user statistics for the agent dashboard
+    """
+    try:
+        stats = get_user_stats(db, current_user.id)
+        return stats
+    except Exception as e:
+        return {
+            "available_slots": 0,
+            "upcoming_meetings": 0,
+            "today_meetings": 0
+        }
+
 def get_user_stats(db: Session, user_id: int) -> Dict[str, Any]:
     """
     Get user statistics for the dashboard

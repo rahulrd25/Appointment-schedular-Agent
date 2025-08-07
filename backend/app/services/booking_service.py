@@ -183,7 +183,8 @@ def cancel_booking(db: Session, booking_id: int, user_id: int = None) -> bool:
 
 def get_upcoming_bookings(db: Session, user_id: int, limit: int = 10) -> List[Booking]:
     """Get upcoming bookings for a user."""
-    now = datetime.utcnow()
+    from datetime import timezone
+    now = datetime.now(timezone.utc)
     return (
         db.query(Booking)
         .filter(
