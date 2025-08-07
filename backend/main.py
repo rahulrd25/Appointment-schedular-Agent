@@ -51,7 +51,10 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 # Include web page routers
 from app.routers.web import web_router
+from app.routers.public_booking import router as public_booking_router
+
 app.include_router(web_router)
+app.include_router(public_booking_router)
 
 # Templates for HTML responses
 templates = Jinja2Templates(directory="app/templates")
