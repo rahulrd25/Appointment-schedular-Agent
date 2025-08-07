@@ -405,12 +405,12 @@
                 
                 const result = await response.json();
                 
-                if (result.user_exists) {
+                if (result.authenticated) {
                     // User exists - show dashboard
                     showDashboard();
                 } else {
-                    // User not authenticated - redirect to login
-                    window.location.href = '/login';
+                    // User not authenticated - redirect to home
+                    window.location.href = '/';
                 }
             } catch (error) {
                 console.error('Error checking user status:', error);
@@ -453,7 +453,6 @@
         // Load dashboard data
         async function loadDashboardData() {
             try {
-                console.log('Loading dashboard data...');
                 const response = await fetch('/dashboard/api/data', {
                     method: 'GET',
                     credentials: 'include'
@@ -464,9 +463,6 @@
                 }
                 
                 const data = await response.json();
-                console.log('Dashboard data loaded:', data);
-                
-
                 
                 updateDashboardUI(data);
             } catch (error) {
@@ -485,25 +481,40 @@
 
         // Update dashboard UI with data
         function updateDashboardUI(data) {
-            console.log('Updating dashboard UI with data:', data);
-            
-            // Update upcoming bookings count
-            const upcomingCount = data.upcomingCount || data.upcomingBookings?.length || 0;
-            document.getElementById('upcoming-count').textContent = upcomingCount;
-            console.log('Updated upcoming count:', upcomingCount);
-            
-            // Update total bookings count
-            const totalBookings = data.totalBookings || data.allBookings?.length || 0;
-            document.getElementById('total-bookings').textContent = totalBookings;
-            console.log('Updated total bookings:', totalBookings);
-            
-            // Update available slots count
-            const availableSlots = data.availableCount || data.availableSlots?.length || 0;
-            document.getElementById('available-slots').textContent = availableSlots;
-            console.log('Updated available slots:', availableSlots);
+            try {
+                // Update upcoming bookings count
+                const upcomingCount = data.upcomingCount || data.upcomingBookings?.length || 0;
+                const upcomingCountElement = document.getElementById('upcoming-count');
+                if (upcomingCountElement) {
+                    upcomingCountElement.textContent = upcomingCount;
+                } else {
+                    console.error('upcoming-count element not found');
+                }
+                
+                // Update total bookings count
+                const totalBookings = data.totalBookings || data.allBookings?.length || 0;
+                const totalBookingsElement = document.getElementById('total-bookings');
+                if (totalBookingsElement) {
+                    totalBookingsElement.textContent = totalBookings;
+                } else {
+                    console.error('total-bookings element not found');
+                }
+                
+                // Update available slots count
+                const availableSlots = data.availableCount || data.availableSlots?.length || 0;
+                const availableSlotsElement = document.getElementById('available-slots');
+                if (availableSlotsElement) {
+                    availableSlotsElement.textContent = availableSlots;
+                } else {
+                    console.error('available-slots element not found');
+                }
             
             // Update upcoming bookings list with real data
             const bookingsList = document.getElementById('upcoming-bookings-list');
+            if (!bookingsList) {
+                console.error('upcoming-bookings-list element not found');
+                return;
+            }
             
             if (data.upcomingBookings && data.upcomingBookings.length > 0) {
                 bookingsList.innerHTML = data.upcomingBookings.map(booking => {
@@ -554,6 +565,9 @@
                     </div>
                 `;
             }
+        } catch (error) {
+            console.error('Error updating dashboard UI:', error);
+        }
         }
 
         // Initialize the application
@@ -847,8 +861,6 @@
             const connectionId = urlParams.get('calendar_connection_id');
             
             if (connectionId) {
-                console.log('Calendar connection detected, completing connection...');
-                
                 // Complete the calendar connection
                 fetch('/dashboard/api/calendar/connect', {
                     method: 'POST',
@@ -861,15 +873,14 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        console.log('Calendar connected successfully!');
                         // Remove the connection ID from URL
                         const newUrl = window.location.pathname;
                         window.history.replaceState({}, document.title, newUrl);
                         
                         // Refresh the page to show updated status
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1000);
+                        // setTimeout(() => {
+                        //     window.location.reload();
+                        // }, 1000);
                     } else {
                         console.error('Calendar connection failed:', data);
                     }

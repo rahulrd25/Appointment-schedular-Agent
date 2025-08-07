@@ -175,7 +175,7 @@ async def google_auth_callback(
             response = RedirectResponse(url="/dashboard", status_code=302)
             response.set_cookie(
                 key="access_token",
-                value=jwt_token,
+                value=f"Bearer {jwt_token}",
                 httponly=True,
                 max_age=1800,
                 secure=False,
@@ -184,7 +184,7 @@ async def google_auth_callback(
             return response
         
     except Exception as e:
-        error_url = "/dashboard?calendar_error=true" if is_calendar_connection else "/login?error=google_auth_failed"
+        error_url = "/dashboard?calendar_error=true" if is_calendar_connection else "/?error=google_auth_failed"
         return RedirectResponse(url=error_url, status_code=302)
 
 

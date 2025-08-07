@@ -451,3 +451,5 @@ class AvailabilityService:
         except Exception as e:
             self.db.rollback()
             raise e
+
+

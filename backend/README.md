@@ -77,7 +77,7 @@ To set up the development environment:
 
 2.  **Install dependencies**: Navigate to the `backend` directory and run:
     ```bash
-    uv pip install -r requirements.txt
+    uv sync
     ```
 
 3.  **Run the application**: 
@@ -111,17 +111,13 @@ The application uses PostgreSQL. Make sure you have a PostgreSQL instance runnin
 
 This project uses Tailwind CSS for styling. To compile the CSS:
 
-1.  **Install Node.js dependencies**: Make sure you have Node.js installed. Then, in the `backend` directory, run:
-    ```bash
-    npm install
-    ```
-
+1.  **Install Tailwind CSS**: Make sure you have Tailwind CSS installed globally. Then, in the `backend` directory, run:
 2.  **Build Tailwind CSS**: To compile `input.css` into `output.css`:
     ```bash
-    npm run css:build
+    tailwindcss -i ./app/static/css/input.css -o ./app/static/css/output.css
     ```
 
     For development with live reloading:
     ```bash
-    npm run css:watch
+    tailwindcss -i ./app/static/css/input.css -o ./app/static/css/output.css --watch
     ```
