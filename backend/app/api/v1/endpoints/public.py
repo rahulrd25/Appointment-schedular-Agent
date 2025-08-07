@@ -149,12 +149,7 @@ async def create_public_booking(
             "success": True,
             "message": "Booking confirmed successfully!",
             "booking_id": booking.id,
-<<<<<<< HEAD
-            "google_event_url": f"https://calendar.google.com/calendar/event?eid={booking.google_event_id}" if booking.google_event_id else None
-=======
-            "email_sent": True
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-        })
+            "email_sent": True        })
         
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid date/time format: {str(e)}")

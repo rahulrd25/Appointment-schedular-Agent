@@ -1,18 +1,13 @@
 {% if bookings %}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {% for booking in bookings %}
-<<<<<<< HEAD
-        <div class="bg-white border-2 border-purple-500 rounded-lg p-2 hover:shadow-md transition-shadow">
-=======
         <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
             <!-- Header with guest info and status -->
             <div class="flex items-start justify-between mb-2">
                 <div class="flex-1">
                     <h3 class="text-base font-semibold text-gray-900 truncate">{{ booking.guest_name }}</h3>
                     <p class="text-sm text-gray-600 truncate">{{ booking.guest_email }}</p>
                 </div>
-<<<<<<< HEAD
                 <span class="px-2 py-1 text-sm font-medium rounded-full ml-2 flex-shrink-0
                     {% if booking.status == 'confirmed' %}
                         bg-green-100 text-green-800
@@ -22,17 +17,6 @@
                         bg-yellow-100 text-yellow-800
                     {% else %}
                         bg-gray-100 text-gray-800
-=======
-                <span class="status-badge
-                    {% if booking.status == 'confirmed' %}
-                        status-confirmed
-                    {% elif booking.status == 'cancelled' %}
-                        status-cancelled
-                    {% elif booking.status == 'rescheduled' %}
-                        status-pending
-                    {% else %}
-                        status-pending
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
                     {% endif %}">
                     {{ booking.status|title }}
                 </span>
@@ -42,11 +26,7 @@
             <div class="space-y-0 mb-2">
                 <div class="flex items-center space-x-1">
                     <svg class="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-<<<<<<< HEAD
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-=======
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z"></path>
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
                     </svg>
                     <span class="text-sm text-gray-600">{{ booking.start_time.split(' at ')[0] }}</span>
                 </div>
@@ -97,7 +77,6 @@
     <div hx-get="/bookings/api/stats" hx-target="#stats-container" hx-trigger="load"></div>
 {% else %}
     <div class="text-center py-12">
-<<<<<<< HEAD
         <div class="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
             <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -109,19 +88,6 @@
             <button hx-get="/bookings/api/list" 
                     hx-target="#bookings-list"
                     class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
-=======
-        <div class="w-24 h-24 mx-auto mb-4 bg-white/10 rounded-full flex items-center justify-center">
-            <svg class="w-12 h-12 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-            </svg>
-        </div>
-        <h3 class="text-lg font-medium text-white mb-2">No bookings found</h3>
-        <p class="text-white/70 mb-6">Try adjusting your search or filter criteria.</p>
-        <div class="flex justify-center space-x-3">
-            <button hx-get="/bookings/api/list" 
-                    hx-target="#bookings-list"
-                    class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-colors">
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
                 Clear Filters
             </button>
         </div>

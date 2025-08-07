@@ -3,461 +3,144 @@
 {% block title %}Bookings - Appointment Agent{% endblock %}
 
 {% block content %}
-<<<<<<< HEAD
 <div class="flex h-screen bg-gray-100">
-=======
-<style>
-    * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-    }
-
-    body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        min-height: 100vh;
-    }
-
-    .main-container {
-        display: flex;
-        min-height: 100vh;
-    }
-
-    .sidebar {
-        width: 280px;
-        background: white;
-        border-right: 1px solid #e2e8f0;
-        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-        z-index: 10;
-    }
-
-    .content-area {
-        flex: 1;
-        background: transparent;
-        overflow-y: auto;
-    }
-
-    .header {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-        padding: 20px 30px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    }
-
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 20px;
-        margin-bottom: 30px;
-    }
-
-    .stat-card {
-        background: white;
-        border-radius: 8px;
-        padding: 8px;
-        box-shadow: 0 1px 8px rgba(0,0,0,0.04);
-        border: 1px solid #e5e7eb;
-        transition: all 0.3s ease;
-        text-align: center;
-    }
-
-    .stat-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 30px rgba(0,0,0,0.12);
-    }
-
-    .stat-icon {
-        width: 24px;
-        height: 24px;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 6px;
-    }
-
-    .stat-title {
-        font-size: 10px;
-        font-weight: 500;
-        color: #64748b;
-        margin-bottom: 3px;
-    }
-
-    .stat-value {
-        font-size: 16px;
-        font-weight: 700;
-        color: #1e293b;
-    }
-
-    .filters-card {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border-radius: 8px;
-        padding: 12px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        margin-bottom: 20px;
-    }
-
-    .filter-input {
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        border-radius: 8px;
-        padding: 8px 12px;
-        font-size: 14px;
-        transition: all 0.2s ease;
-        background: rgba(255, 255, 255, 0.9);
-        color: black;
-    }
-
-    .filter-input:focus {
-        outline: none;
-        border-color: #1e3c72;
-        box-shadow: 0 0 0 3px rgba(30, 60, 114, 0.1);
-    }
-
-    .filter-input::placeholder {
-        color: #6b7280;
-    }
-
-    .btn-primary {
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 8px;
-        font-weight: 600;
-        font-size: 14px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-
-    .btn-primary:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 8px 25px rgba(30, 60, 114, 0.3);
-    }
-
-    .booking-card {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border-radius: 16px;
-        padding: 24px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        margin-bottom: 16px;
-        transition: all 0.3s ease;
-    }
-
-    .booking-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 30px rgba(0,0,0,0.12);
-    }
-
-    .status-badge {
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 600;
-        text-transform: uppercase;
-    }
-
-    .status-confirmed {
-        background: #dcfce7;
-        color: #166534;
-    }
-
-    .status-pending {
-        background: #fef3c7;
-        color: #92400e;
-    }
-
-    .status-cancelled {
-        background: #fee2e2;
-        color: #dc2626;
-    }
-
-    .page-title {
-        font-size: 28px;
-        font-weight: 700;
-        color: white;
-        margin-bottom: 8px;
-    }
-
-    .page-subtitle {
-        color: white;
-        font-size: 16px;
-    }
-
-    /* Loader Styles */
-    .loader-container {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(30, 60, 114, 0.8);
-        backdrop-filter: blur(4px);
-        z-index: 9999;
-        justify-content: center;
-        align-items: center;
-    }
-
-    .loader {
-        background: white;
-        border-radius: 16px;
-        padding: 32px;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-        text-align: center;
-        max-width: 320px;
-        width: 90%;
-    }
-
-    .loader-spinner {
-        width: 48px;
-        height: 48px;
-        border: 4px solid #e5e7eb;
-        border-top: 4px solid #1e3c72;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin: 0 auto 16px;
-    }
-
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-
-    .loader-text {
-        color: #1e293b;
-        font-size: 16px;
-        font-weight: 600;
-        margin-bottom: 8px;
-    }
-
-    .loader-subtext {
-        color: #64748b;
-        font-size: 14px;
-    }
-
-    /* HTMX Loading States */
-    .htmx-request .loader-container {
-        display: flex;
-    }
-
-    .htmx-request .content-area {
-        opacity: 0.3;
-        pointer-events: none;
-    }
-
-    /* Modal Loader */
-    .modal-loader {
-        display: none;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        z-index: 10;
-    }
-
-    .modal-loader .loader-spinner {
-        width: 32px;
-        height: 32px;
-        border: 3px solid #e5e7eb;
-        border-top: 3px solid #1e3c72;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin: 0 auto 8px;
-    }
-
-    .modal-loader .loader-text {
-        color: #1e293b;
-        font-size: 14px;
-        font-weight: 500;
-        text-align: center;
-    }
-
-    /* Modal Loading State */
-    #booking-modal.htmx-request .modal-loader {
-        display: block;
-    }
-
-    #booking-modal.htmx-request .bg-white {
-        opacity: 0.3;
-        pointer-events: none;
-    }
-</style>
-
-<!-- Loader -->
-<div class="loader-container">
-    <div class="loader">
-        <div class="loader-spinner"></div>
-        <div class="loader-text">Loading bookings...</div>
-        <div class="loader-subtext">Please wait while we fetch your data</div>
-    </div>
-</div>
-
-<div class="main-container">
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
     <!-- Sidebar -->
     {% set sidebar_active = 'bookings' %}
     {% include '_sidebar.html' %}
 
     <!-- Main Content -->
-<<<<<<< HEAD
     <div class="flex-1 overflow-auto">
         <!-- Header -->
         <header class="bg-white shadow-sm border-b">
             <div class="flex items-center justify-between px-6 py-4">
                 <div>
-                    <h1 class="text-2xl font-semibold text-gray-900">Bookings Dashboard</h1>
-                    <p class="text-gray-600">Manage your appointments and meetings</p>
-=======
-    <div class="content-area">
-        <!-- Header -->
-        <div class="header">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="page-title">Bookings</h1>
-                    <p class="page-subtitle">Manage your appointments and meetings</p>
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
+                    <h1 class="text-2xl font-bold text-black">Bookings</h1>
+                    <p class="text-black">Manage your appointments and bookings</p>
                 </div>
-                
                 <div class="flex items-center space-x-4">
-                    <div class="flex items-center space-x-2">
-<<<<<<< HEAD
-                        <span class="text-sm text-gray-600">Welcome,</span>
-                        <span class="font-medium text-gray-900">{{ current_user.full_name or current_user.email }}</span>
-=======
-                        <span class="text-sm text-white">Welcome,</span>
-                        <span class="font-medium text-white">{{ current_user.full_name or current_user.email }}</span>
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-                    </div>
-                    <a href="/logout" class="text-gray-600 hover:text-gray-900">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                        </svg>
-                    </a>
+                    <a href="/logout" class="text-black hover:text-gray-700">Logout</a>
                 </div>
             </div>
-<<<<<<< HEAD
         </header>
 
-        <!-- Bookings Content -->
-        <main class="p-4">
+        <!-- Content -->
+        <main class="p-6">
             <!-- Stats Cards -->
-            <div id="stats-container" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4" hx-get="/bookings/api/stats" hx-trigger="load">
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-lg shadow p-3 border-l-4 border-blue-500">
                     <div class="flex items-center">
-                        <div class="p-2 bg-blue-100 rounded-lg">
-                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="p-3 rounded-full bg-blue-100">
+                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                             </svg>
                         </div>
                         <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-600">Total Bookings</p>
-                            <p class="text-2xl font-semibold text-gray-900">0</p>
+                            <p class="text-xs font-medium text-black">Total Bookings</p>
+                            <p class="text-lg font-semibold text-black" id="total-bookings">Loading...</p>
                         </div>
                     </div>
                 </div>
-                
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+
+                <div class="bg-white rounded-lg shadow p-3 border-l-4 border-green-500">
                     <div class="flex items-center">
-                        <div class="p-2 bg-green-100 rounded-lg">
-                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="p-3 rounded-full bg-green-100">
+                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
                         </div>
                         <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-600">Confirmed</p>
-                            <p class="text-2xl font-semibold text-gray-900">0</p>
+                            <p class="text-xs font-medium text-black">Confirmed</p>
+                            <p class="text-lg font-semibold text-black" id="confirmed-bookings">Loading...</p>
                         </div>
                     </div>
                 </div>
-                
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+
+                <div class="bg-white rounded-lg shadow p-3 border-l-4 border-yellow-500">
                     <div class="flex items-center">
-                        <div class="p-2 bg-yellow-100 rounded-lg">
-                            <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="p-3 rounded-full bg-yellow-100">
+                            <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
                         </div>
                         <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-600">Upcoming</p>
-                            <p class="text-2xl font-semibold text-gray-900">0</p>
+                            <p class="text-xs font-medium text-black">Pending</p>
+                            <p class="text-lg font-semibold text-black" id="pending-bookings">Loading...</p>
                         </div>
                     </div>
                 </div>
-                
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+
+                <div class="bg-white rounded-lg shadow p-3 border-l-4 border-red-500">
                     <div class="flex items-center">
-                        <div class="p-2 bg-red-100 rounded-lg">
-                            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="p-3 rounded-full bg-red-100">
+                            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
                         </div>
                         <div class="ml-4">
-                            <p class="text-sm font-medium text-gray-600">Cancelled</p>
-                            <p class="text-2xl font-semibold text-gray-900">0</p>
+                            <p class="text-xs font-medium text-black">Cancelled</p>
+                            <p class="text-lg font-semibold text-black" id="cancelled-bookings">Loading...</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Filters and Search -->
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-2">
-                <form hx-get="/bookings/api/list" hx-target="#bookings-list" hx-trigger="change from:select, input from:#search-input">
-                    <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
-                        <div class="flex items-center space-x-2">
-                            <label class="text-sm font-medium text-gray-700">Status:</label>
-                            <select name="status" class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-[140px] text-gray-900" style="background-color: white;">
-                                <option value="" class="text-gray-900">All Status</option>
-                                <option value="confirmed" class="text-gray-900">Confirmed</option>
-                                <option value="cancelled" class="text-gray-900">Cancelled</option>
-                                <option value="rescheduled" class="text-gray-900">Rescheduled</option>
+            <!-- Filters -->
+            <div class="bg-white rounded-lg shadow mb-6">
+                <div class="p-6 border-b">
+                    <h3 class="text-lg font-semibold text-black">Filters</h3>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                            <select id="status-filter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                <option value="">All Statuses</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="pending">Pending</option>
+                                <option value="cancelled">Cancelled</option>
+                                <option value="rescheduled">Rescheduled</option>
                             </select>
                         </div>
-                        
-                        <div class="flex items-center space-x-2">
-                            <label class="text-sm font-medium text-gray-700">Time:</label>
-                            <select name="time" class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-[140px] text-gray-900" style="background-color: white;">
-                                <option value="" class="text-gray-900">All Time</option>
-                                <option value="today" class="text-gray-900">Today</option>
-                                <option value="week" class="text-gray-900">This Week</option>
-                                <option value="month" class="text-gray-900">This Month</option>
-                                <option value="past" class="text-gray-900">Past</option>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                            <select id="date-filter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                <option value="">All Dates</option>
+                                <option value="today">Today</option>
+                                <option value="week">This Week</option>
+                                <option value="month">This Month</option>
+                                <option value="past">Past</option>
+                                <option value="upcoming">Upcoming</option>
                             </select>
                         </div>
-                        
-                        <div class="flex items-center space-x-2">
-                            <label class="text-sm font-medium text-gray-700">Search:</label>
-                            <input type="text" name="search" id="search-input" placeholder="Guest name or email..." 
-                                   class="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-64 bg-white" style="background-color: white;">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Search</label>
+                            <input type="text" id="search-filter" placeholder="Search by name or email..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <div class="flex items-end">
+                            <button id="apply-filters" class="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
+                                Apply Filters
+                            </button>
                         </div>
                     </div>
-                </form>
-            </div>
-
-            <!-- Connection line -->
-            <div class="flex justify-center mb-2">
-                <div class="w-16 h-0.5 bg-gray-300"></div>
+                </div>
             </div>
 
             <!-- Bookings List -->
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h2 class="text-lg font-semibold text-gray-900">All Bookings</h2>
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-6 border-b">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-black">All Bookings</h3>
+                        <button id="refresh-bookings" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium">
+                            Refresh
+                        </button>
+                    </div>
                 </div>
-                
                 <div class="p-6">
-                    <div id="bookings-list" class="space-y-4" hx-get="/bookings/api/list" hx-trigger="load">
-                        <!-- Loading state -->
+                    <div id="bookings-list">
+                        <!-- Bookings will be loaded here -->
                         <div class="text-center py-8">
-                            <svg class="mx-auto h-12 w-12 text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                            </svg>
-                            <h3 class="mt-2 text-sm font-medium text-gray-900">Loading bookings...</h3>
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+                            <p class="text-gray-500 mt-2">Loading bookings...</p>
                         </div>
                     </div>
                 </div>
@@ -466,117 +149,69 @@
     </div>
 </div>
 
-<!-- Booking Detail Modal Container -->
-<div id="booking-modal"></div>
-=======
-        </div>
-
-        <!-- Bookings Content -->
-        <div>
-            <!-- Filters and Search -->
-            <div class="filters-card">
-                <form hx-get="/bookings/api/list" 
-                      hx-target="#bookings-list" 
-                      hx-trigger="change from:select, input from:#search-input"
-                      hx-indicator=".loader-container">
-                    <div class="flex flex-wrap items-center gap-3">
-                        <div class="flex items-center gap-2">
-                            <label class="text-sm font-medium text-black">Status:</label>
-                            <select name="status" class="filter-input w-32">
-                                <option value="">All Status</option>
-                                <option value="confirmed">Confirmed</option>
-                                <option value="pending">Pending</option>
-                                <option value="cancelled">Cancelled</option>
-                            </select>
-                        </div>
-                        
-                        <div class="flex items-center gap-2">
-                            <label class="text-sm font-medium text-black">Date:</label>
-                            <select name="date_filter" class="filter-input w-32">
-                                <option value="">All Dates</option>
-                                <option value="today">Today</option>
-                                <option value="tomorrow">Tomorrow</option>
-                                <option value="this_week">This Week</option>
-                                <option value="next_week">Next Week</option>
-                            </select>
-                        </div>
-                        
-                        <div class="flex items-center gap-2">
-                            <label class="text-sm font-medium text-black">Search:</label>
-                            <input type="text" id="search-input" name="search" placeholder="Search by name or email..." class="filter-input w-48">
-                        </div>
-                        
-                        <button type="submit" class="btn-primary px-4 py-2">Filter</button>
-                    </div>
-                </form>
-                
-                <!-- Stats Cards -->
-                <div id="stats-container" 
-                     class="stats-grid mt-6" 
-                     hx-get="/bookings/api/stats" 
-                     hx-trigger="load"
-                     hx-indicator=".loader-container">
-                </div>
-                
-                <!-- Bookings List -->
-                <div id="bookings-list" 
-                     class="mt-6" 
-                     hx-get="/bookings/api/list?v={{ range(1, 1000) | random }}" 
-                     hx-trigger="load"
-                     hx-indicator=".loader-container">
-                </div>
-                
-                <!-- Fallback script to ensure content loads on refresh -->
-                <script>
-                    document.addEventListener('DOMContentLoaded', function() {
-                        // Ensure stats and bookings load even if HTMX fails
-                        setTimeout(function() {
-                            if (document.getElementById('stats-container').children.length === 0) {
-                                htmx.ajax('GET', '/bookings/api/stats', '#stats-container');
-                            }
-                            if (document.getElementById('bookings-list').children.length === 0) {
-                                htmx.ajax('GET', '/bookings/api/list', '#bookings-list');
-                            }
-                        }, 100);
-                    });
-                </script>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Container for Booking Details and Forms -->
-<div id="booking-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
-        <!-- Modal content will be loaded here via HTMX -->
-        <div class="modal-loader">
-            <div class="loader-spinner"></div>
-            <div class="loader-text">Loading...</div>
-        </div>
-    </div>
+<!-- Booking Details Modal -->
+<div id="booking-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+    <!-- Modal content will be loaded here -->
 </div>
 
 <script>
-    // Handle modal display
-    document.addEventListener('htmx:afterSwap', function(event) {
-        if (event.target.id === 'booking-modal') {
-            document.getElementById('booking-modal').classList.remove('hidden');
-        }
+document.addEventListener('DOMContentLoaded', function() {
+    // Load initial data
+    loadBookings();
+    loadStats();
+
+    // Event listeners
+    document.getElementById('apply-filters').addEventListener('click', loadBookings);
+    document.getElementById('refresh-bookings').addEventListener('click', function() {
+        loadBookings();
+        loadStats();
     });
 
-    // Close modal when clicking outside
-    document.getElementById('booking-modal').addEventListener('click', function(event) {
-        if (event.target === this) {
-            this.classList.add('hidden');
+    // Search on enter
+    document.getElementById('search-filter').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            loadBookings();
         }
     });
+});
 
-    // Close modal with Escape key
-    document.addEventListener('keydown', function(event) {
-        if (event.key === 'Escape') {
-            document.getElementById('booking-modal').classList.add('hidden');
-        }
-    });
+function loadBookings() {
+    const statusFilter = document.getElementById('status-filter').value;
+    const dateFilter = document.getElementById('date-filter').value;
+    const searchFilter = document.getElementById('search-filter').value;
+
+    const params = new URLSearchParams();
+    if (statusFilter) params.append('status', statusFilter);
+    if (dateFilter) params.append('date_range', dateFilter);
+    if (searchFilter) params.append('search', searchFilter);
+
+    fetch(`/bookings/api/list?${params.toString()}`)
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('bookings-list').innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error loading bookings:', error);
+            document.getElementById('bookings-list').innerHTML = `
+                <div class="text-center py-8">
+                    <p class="text-red-500">Error loading bookings. Please try again.</p>
+                </div>
+            `;
+        });
+}
+
+function loadStats() {
+    fetch('/bookings/api/stats')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('total-bookings').textContent = data.total || 0;
+            document.getElementById('confirmed-bookings').textContent = data.confirmed || 0;
+            document.getElementById('pending-bookings').textContent = data.pending || 0;
+            document.getElementById('cancelled-bookings').textContent = data.cancelled || 0;
+        })
+        .catch(error => {
+            console.error('Error loading stats:', error);
+        });
+}
 </script>
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
 {% endblock %} 

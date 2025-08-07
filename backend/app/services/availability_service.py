@@ -8,20 +8,6 @@ from app.models.models import AvailabilitySlot, User, Booking
 from app.schemas.schemas import AvailabilitySlotCreate, AvailabilitySlotUpdate
 
 
-<<<<<<< HEAD
-def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id: int) -> AvailabilitySlot:
-    """Create a new availability slot for a user."""
-    db_slot = AvailabilitySlot(
-        user_id=user_id,
-        start_time=slot.start_time,
-        end_time=slot.end_time,
-        is_available=slot.is_available
-    )
-    db.add(db_slot)
-    db.commit()
-    db.refresh(db_slot)
-    return db_slot
-=======
 def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id: int) -> dict:
     """Create a new availability slot for a user."""
     try:
@@ -140,8 +126,6 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
             "calendar_error": str(e),
             "google_event_id": None
         }
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-
 
 def get_availability_slots_for_user(db: Session, user_id: int, include_unavailable: bool = False) -> List[AvailabilitySlot]:
     """Get all availability slots for a user."""
@@ -211,43 +195,19 @@ def update_availability_slot(db: Session, slot_id: int, slot_update: Availabilit
     return slot
 
 
-<<<<<<< HEAD
-def delete_availability_slot(db: Session, slot_id: int, user_id: int) -> bool:
-    """Delete an availability slot."""
-    slot = get_availability_slot(db, slot_id, user_id)
-    if not slot:
-        return False
-=======
 def delete_availability_slot(db: Session, slot_id: int, user_id: int) -> dict:
     """Delete an availability slot and its Google Calendar event if linked."""
     slot = get_availability_slot(db, slot_id, user_id)
     if not slot:
-        return {"success": False, "message": "Slot not found"}
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-    
+        return {"success": False, "message": "Slot not found"}    
     # Check if there are any confirmed bookings for this slot
     existing_booking = db.query(Booking).filter(
         and_(
-<<<<<<< HEAD
-            Booking.availability_slot_id == slot_id,
-=======
-            Booking.availability_slot_id == slot.id,
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-            Booking.status == "confirmed"
+            Booking.availability_slot_id == slot.id,            Booking.status == "confirmed"
         )
     ).first()
     
     if existing_booking:
-<<<<<<< HEAD
-        # Don't delete slots with confirmed bookings, just mark as unavailable
-        slot.is_available = False
-        db.commit()
-        return True
-    
-    db.delete(slot)
-    db.commit()
-    return True
-=======
         return {"success": False, "message": "Cannot delete slot with confirmed bookings"}
     
     calendar_deleted = None
@@ -288,8 +248,6 @@ def delete_availability_slot(db: Session, slot_id: int, user_id: int) -> dict:
         "calendar_deleted": calendar_deleted,
         "calendar_error": calendar_error
     }
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-
 
 def check_slot_availability(db: Session, slot_id: int) -> bool:
     """Check if a slot is available for booking."""
@@ -297,15 +255,8 @@ def check_slot_availability(db: Session, slot_id: int) -> bool:
     if not slot or not slot.is_available:
         return False
     
-<<<<<<< HEAD
-    # Check if slot is in the future - ensure timezone-naive comparison
-    slot_start_naive = slot.start_time.replace(tzinfo=None) if slot.start_time.tzinfo else slot.start_time
-    if slot_start_naive <= datetime.utcnow():
-=======
     # Check if slot is in the future - ensure timezone-aware comparison
-    if slot.start_time <= datetime.now(timezone.utc):
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-        return False
+    if slot.start_time <= datetime.now(timezone.utc):        return False
     
     # Check if slot is already booked
     existing_booking = db.query(Booking).filter(
@@ -328,14 +279,9 @@ def create_availability_slots_from_calendar(db: Session, user: User, start_date:
     # Initialize Google Calendar service
     calendar_service = GoogleCalendarService(
         access_token=user.google_access_token,
-<<<<<<< HEAD
-        refresh_token=user.google_refresh_token
-=======
         refresh_token=user.google_refresh_token,
         db=db,
-        user_id=user.id
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-    )
+        user_id=user.id    )
     
     created_slots = []
     current_date = start_date.date()
@@ -352,34 +298,16 @@ def create_availability_slots_from_calendar(db: Session, user: User, start_date:
             # Convert timezone-aware datetimes to naive for database storage
             start_time_naive = slot_data['start_time'].replace(tzinfo=None)
             end_time_naive = slot_data['end_time'].replace(tzinfo=None)
-<<<<<<< HEAD
-=======
-            google_event_id = slot_data.get('event_id')  # Save event ID if present
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
             
-            # Check if this slot already exists
-            existing_slot = db.query(AvailabilitySlot).filter(
-                and_(
-                    AvailabilitySlot.user_id == user.id,
-                    AvailabilitySlot.start_time == start_time_naive,
-                    AvailabilitySlot.end_time == end_time_naive
-                )
-            ).first()
-            
-            if not existing_slot:
-                db_slot = AvailabilitySlot(
-                    user_id=user.id,
-                    start_time=start_time_naive,
-                    end_time=end_time_naive,
-<<<<<<< HEAD
-                    is_available=True
-=======
-                    is_available=True,
-                    google_event_id=google_event_id
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-                )
-                db.add(db_slot)
-                created_slots.append(db_slot)
+            db_slot = AvailabilitySlot(
+                user_id=user.id,
+                start_time=start_time_naive,
+                end_time=end_time_naive,
+                is_available=True,
+                google_event_id=google_event_id
+            )
+            db.add(db_slot)
+            created_slots.append(db_slot)
         
         current_date += timedelta(days=1)
     
@@ -387,31 +315,6 @@ def create_availability_slots_from_calendar(db: Session, user: User, start_date:
     return created_slots
 
 
-<<<<<<< HEAD
-def sync_calendar_availability(db: Session, user: User) -> dict:
-    """Initialize calendar sync - this now just validates the connection."""
-    if not user.google_calendar_connected:
-        return {"success": False, "message": "Google Calendar not connected"}
-    
-    try:
-        # Test the calendar connection by getting events
-        from app.services.google_calendar_service import GoogleCalendarService
-        calendar_service = GoogleCalendarService(
-            access_token=user.google_access_token,
-            refresh_token=user.google_refresh_token
-        )
-        
-        # Try to get events to verify connection
-        events = calendar_service.get_events()
-        
-        return {
-            "success": True,
-            "message": f"Calendar connected successfully! Found {len(events)} events in your calendar.",
-            "events_found": len(events)
-        }
-    except Exception as e:
-        return {"success": False, "message": f"Failed to connect to calendar: {str(e)}"}
-=======
 def check_calendar_connection(db: Session, user: User) -> dict:
     """Simple check if calendar is connected - no token refresh."""
     if not user.google_calendar_connected:
@@ -425,8 +328,6 @@ def check_calendar_connection(db: Session, user: User) -> dict:
         "message": "Google Calendar connected",
         "connected": True
     }
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-
 
 class AvailabilityService:
     """Service class for availability operations"""

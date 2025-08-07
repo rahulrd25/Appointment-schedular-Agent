@@ -11,42 +11,30 @@ from googleapiclient.discovery import build
 class GoogleCalendarService:
     def __init__(self, access_token: str = None, refresh_token: str = None, db: Optional[Any] = None, user_id: Optional[int] = None):
         self.credentials = None
-<<<<<<< HEAD
-=======
         self.db = db
         self.user_id = user_id
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-        if access_token:
-            # Create credentials with available tokens
-            # Note: refresh_token can be None for some OAuth flows
+        
+        if access_token and refresh_token:
             self.credentials = Credentials(
                 token=access_token,
-                refresh_token=refresh_token,  # Can be None
+                refresh_token=refresh_token,
                 token_uri="https://oauth2.googleapis.com/token",
                 client_id=os.getenv("GOOGLE_CLIENT_ID"),
                 client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-<<<<<<< HEAD
-                scopes=["https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.readonly"],
-=======
                 scopes=[
                     "https://www.googleapis.com/auth/calendar",
                     "https://www.googleapis.com/auth/calendar.events",
                     "https://www.googleapis.com/auth/calendar.readonly"
                 ],
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
             )
 
     def get_authorization_url(self):
         flow = InstalledAppFlow.from_client_secrets_file(
-<<<<<<< HEAD
-            'client_secret.json', ["https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.readonly"]
-=======
             'client_secret.json', [
                 "https://www.googleapis.com/auth/calendar",
                 "https://www.googleapis.com/auth/calendar.events",
                 "https://www.googleapis.com/auth/calendar.readonly"
             ]
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
         )
         flow.redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
         authorization_url, state = flow.authorization_url(
@@ -58,15 +46,11 @@ class GoogleCalendarService:
 
     def get_tokens_from_auth_code(self, auth_code: str):
         flow = InstalledAppFlow.from_client_secrets_file(
-<<<<<<< HEAD
-            'client_secret.json', ["https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.readonly"]
-=======
             'client_secret.json', [
                 "https://www.googleapis.com/auth/calendar",
                 "https://www.googleapis.com/auth/calendar.events",
                 "https://www.googleapis.com/auth/calendar.readonly"
             ]
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
         )
         flow.redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
         flow.fetch_token(code=auth_code)
@@ -114,64 +98,6 @@ class GoogleCalendarService:
         else:
             raise Exception("Token refresh failed: " + result["message"])
 
-<<<<<<< HEAD
-=======
-    def _handle_google_api_error(self, error):
-        """Handle Google API errors."""
-        raise Exception("Calendar access failed")
-
-
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-    def get_events(self, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None):
-        """Get events from the calendar, optionally filtered by date range."""
-        self._ensure_valid_credentials()
-        service = build('calendar', 'v3', credentials=self.credentials)
-        
-        # Set default date range if not provided
-        if not start_date:
-            start_date = datetime.now(timezone.utc)
-        if not end_date:
-            end_date = start_date.replace(hour=23, minute=59, second=59)
-        
-        # Ensure datetime objects are timezone-aware
-        if start_date.tzinfo is None:
-            start_date = start_date.replace(tzinfo=timezone.utc)
-        if end_date.tzinfo is None:
-            end_date = end_date.replace(tzinfo=timezone.utc)
-        
-<<<<<<< HEAD
-        events_result = service.events().list(
-            calendarId='primary',
-            timeMin=start_date.isoformat(),
-            timeMax=end_date.isoformat(),
-            singleEvents=True,
-            orderBy='startTime'
-        ).execute()
-        
-        events = events_result.get('items', [])
-        return events
-
-    def check_availability(self, start_time: datetime, end_time: datetime) -> bool:
-        """Check if a time slot is available (no conflicting events)."""
-        self._ensure_valid_credentials()
-        service = build('calendar', 'v3', credentials=self.credentials)
-        
-        # Ensure datetime objects are timezone-aware
-        if start_time.tzinfo is None:
-            start_time = start_time.replace(tzinfo=timezone.utc)
-        if end_time.tzinfo is None:
-            end_time = end_time.replace(tzinfo=timezone.utc)
-        
-        # Get events that overlap with the requested time slot
-        events_result = service.events().list(
-            calendarId='primary',
-            timeMin=start_time.isoformat(),
-            timeMax=end_time.isoformat(),
-            singleEvents=True
-        ).execute()
-        
-        events = events_result.get('items', [])
-=======
         try:
             events_result = service.events().list(
                 calendarId='primary',
@@ -204,9 +130,7 @@ class GoogleCalendarService:
             singleEvents=True
         ).execute()
         
-        events = events_result.get('items', [])
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-        
+        events = events_result.get('items', [])        
         # Filter out events that are marked as 'transparent' (free time)
         conflicting_events = [
             event for event in events 
@@ -215,11 +139,7 @@ class GoogleCalendarService:
         
         return len(conflicting_events) == 0
 
-<<<<<<< HEAD
-    def get_available_slots(self, date: datetime, duration_minutes: int = 30) -> list:
-=======
     def get_available_slots(self, date, duration_minutes: int = 30) -> list:
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
         """Get available time slots for a given date."""
         self._ensure_valid_credentials()
         service = build('calendar', 'v3', credentials=self.credentials)
@@ -229,18 +149,12 @@ class GoogleCalendarService:
         end_hour = 17
         
         # Ensure date is timezone-aware (UTC)
-<<<<<<< HEAD
-        if date.tzinfo is None:
-            date = date.replace(tzinfo=timezone.utc)
-=======
         # Convert date to datetime if it's a date object
         if hasattr(date, 'date'):  # It's a datetime object
             if date.tzinfo is None:
                 date = date.replace(tzinfo=timezone.utc)
         else:  # It's a date object, convert to datetime
-            date = datetime.combine(date, datetime.min.time()).replace(tzinfo=timezone.utc)
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-        
+            date = datetime.combine(date, datetime.min.time()).replace(tzinfo=timezone.utc)        
         # Create start and end times for the day (timezone-aware)
         day_start = date.replace(hour=start_hour, minute=0, second=0, microsecond=0)
         day_end = date.replace(hour=end_hour, minute=0, second=0, microsecond=0)
@@ -300,9 +214,6 @@ class GoogleCalendarService:
         
         return available_slots
 
-<<<<<<< HEAD
-    def create_event(
-=======
     def create_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a calendar event with the provided event data."""
         self._ensure_valid_credentials()
@@ -315,9 +226,7 @@ class GoogleCalendarService:
         except Exception as e:
             self._handle_google_api_error(e)
 
-    def create_booking_event(
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-        self,
+    def create_booking_event(        self,
         title: str,
         start_time: datetime,
         end_time: datetime,
@@ -366,17 +275,11 @@ class GoogleCalendarService:
         if location:
             event['location'] = location
         
-<<<<<<< HEAD
-        created_event = service.events().insert(calendarId='primary', body=event, sendUpdates='all').execute()
-        return created_event
-=======
         try:
             created_event = service.events().insert(calendarId='primary', body=event, sendUpdates='all').execute()
             return created_event
         except Exception as e:
             self._handle_google_api_error(e)
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-
     def update_event(
         self,
         event_id: str,
@@ -387,46 +290,6 @@ class GoogleCalendarService:
         location: Optional[str] = None
     ) -> Dict[str, Any]:
         """Update an existing calendar event."""
-<<<<<<< HEAD
-        self._ensure_valid_credentials()
-        
-        service = build('calendar', 'v3', credentials=self.credentials)
-        
-        # Get the existing event
-        event = service.events().get(calendarId='primary', eventId=event_id).execute()
-        
-        # Update fields if provided
-        if title:
-            event['summary'] = title
-        if description:
-            event['description'] = description
-        if location:
-            event['location'] = location
-        if start_time:
-            # Ensure datetime object is timezone-aware
-            if start_time.tzinfo is None:
-                start_time = start_time.replace(tzinfo=timezone.utc)
-            event['start'] = {
-                'dateTime': start_time.isoformat(),
-                'timeZone': 'UTC',
-            }
-        if end_time:
-            # Ensure datetime object is timezone-aware
-            if end_time.tzinfo is None:
-                end_time = end_time.replace(tzinfo=timezone.utc)
-            event['end'] = {
-                'dateTime': end_time.isoformat(),
-                'timeZone': 'UTC',
-            }
-        
-        updated_event = service.events().update(
-            calendarId='primary', 
-            eventId=event_id, 
-            body=event,
-            sendUpdates='all'
-        ).execute()
-        return updated_event
-=======
         try:
             print(f"Updating event: {event_id}")
             self._ensure_valid_credentials()
@@ -480,8 +343,6 @@ class GoogleCalendarService:
             import traceback
             print(f"Full traceback: {traceback.format_exc()}")
             raise
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-
     def delete_event(self, event_id: str) -> bool:
         """Delete a calendar event."""
         try:
@@ -491,24 +352,6 @@ class GoogleCalendarService:
             return True
         except Exception as e:
             print(f"Error deleting event: {e}")
-<<<<<<< HEAD
-=======
-            self._handle_google_api_error(e)
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
-            return False
-
-    def get_event(self, event_id: str) -> Optional[Dict[str, Any]]:
-        """Get a specific calendar event."""
-        try:
-<<<<<<< HEAD
-            self._ensure_valid_credentials()
-            service = build('calendar', 'v3', credentials=self.credentials)
-            event = service.events().get(calendarId='primary', eventId=event_id).execute()
-            return event
-        except Exception as e:
-            print(f"Error getting event: {e}")
-            return None
-=======
             print(f"Getting event: {event_id}")
             self._ensure_valid_credentials()
             service = build('calendar', 'v3', credentials=self.credentials)
@@ -521,5 +364,3 @@ class GoogleCalendarService:
             self._handle_google_api_error(e)
             return None
 
-
->>>>>>> e3b999cd02f578d5176e7dbc287d1a2a1f5f3840
