@@ -1,5 +1,6 @@
 from typing import List, Optional
 from datetime import datetime, timezone
+import logging
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -9,6 +10,8 @@ from app.schemas.schemas import BookingCreate, BookingUpdate, PublicBookingCreat
 from app.services.availability_service import get_availability_slot, check_slot_availability
 from app.services.google_calendar_service import GoogleCalendarService
 from app.services.email_service import send_booking_confirmation_email
+
+logger = logging.getLogger(__name__)
 
 
 def create_booking(
@@ -60,10 +63,10 @@ def create_booking(
         db.add(db_booking)
         db.commit()
         db.refresh(db_booking)
-        print(f"✅ Booking created successfully: {db_booking.id}")
+        logger.info(f"✅ Booking created successfully: {db_booking.id}")
         
     except Exception as e:
-        print(f"Error creating booking: {e}")
+        logger.error(f"Error creating booking: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -83,10 +86,10 @@ def create_booking(
             if slot.google_event_id:
                 try:
                     calendar_service.delete_event(slot.google_event_id)
-                    print(f"Deleted availability slot calendar event: {slot.google_event_id}")
+                    logger.info(f"Deleted availability slot calendar event: {slot.google_event_id}")
                     slot.google_event_id = None  # Clear the slot's calendar event ID
                 except Exception as e:
-                    print(f"Failed to delete availability slot calendar event: {e}")
+                    logger.error(f"Failed to delete availability slot calendar event: {e}")
             
             event_title = f"Meeting with {booking_data.guest_name}"
             event_description = f"Meeting scheduled via booking system.\n\nGuest: {booking_data.guest_name}\nEmail: {booking_data.guest_email}"
@@ -107,10 +110,10 @@ def create_booking(
             # Update database with calendar event ID
             db_booking.google_event_id = google_event_id
             db.commit()
-            print(f"✅ Successfully synced booking {db_booking.id} to Google Calendar")
+            logger.info(f"✅ Successfully synced booking {db_booking.id} to Google Calendar")
             
         except Exception as e:
-            print(f"Failed to create Google Calendar event: {e}")
+            logger.error(f"Failed to create Google Calendar event: {e}")
             # Booking exists in database, calendar sync failed
             # This is acceptable - database is source of truth
     
@@ -129,13 +132,13 @@ def create_booking(
                 db=db
             )
             if email_sent:
-                print(f"✅ Booking confirmation emails sent successfully for booking {db_booking.id}")
+                logger.info(f"✅ Booking confirmation emails sent successfully for booking {db_booking.id}")
             else:
-                print(f"⚠️  Failed to send booking confirmation emails for booking {db_booking.id}")
+                logger.warning(f"⚠️  Failed to send booking confirmation emails for booking {db_booking.id}")
         except Exception as e:
-            print(f"Failed to send confirmation email: {e}")
+            logger.error(f"Failed to send confirmation email: {e}")
     else:
-        print(f"⚠️  Skipping email confirmation - booking ID: {db_booking.id}, calendar event ID: {google_event_id}")
+        logger.warning(f"⚠️  Skipping email confirmation - booking ID: {db_booking.id}, calendar event ID: {google_event_id}")
     
     return db_booking
 
@@ -184,22 +187,22 @@ def update_booking(
                 )
                 
                 # If status is being changed to cancelled, delete the event
-                if update_data.get('status') == 'cancelled':
+                if booking_update.status == 'cancelled':
                     calendar_service.delete_event(booking.google_event_id)
-                    print(f"Deleted Google Calendar event: {booking.google_event_id}")
+                    logger.info(f"Deleted Google Calendar event: {booking.google_event_id}")
                 
                 # If times are being updated, update the event
-                elif (update_data.get('start_time') and update_data.get('end_time') and 
-                      (booking.start_time != original_start_time or booking.end_time != original_end_time)):
+                elif (booking_update.start_time and booking_update.end_time and 
+                      (booking.start_time != booking_update.start_time or booking.end_time != booking_update.end_time)):
                     calendar_service.update_event(
                         event_id=booking.google_event_id,
                         start_time=booking.start_time,
                         end_time=booking.end_time
                     )
-                    print(f"Updated Google Calendar event: {booking.google_event_id}")
+                    logger.info(f"Updated Google Calendar event: {booking.google_event_id}")
                     
         except Exception as e:
-            print(f"Failed to update Google Calendar event: {e}")
+            logger.error(f"Failed to update Google Calendar event: {e}")
             # Continue with booking update even if calendar update fails    
     db.commit()
     db.refresh(booking)
@@ -227,7 +230,7 @@ def cancel_booking(db: Session, booking_id: int, user_id: int = None) -> bool:
                 )
                 calendar_service.delete_event(booking.google_event_id)
         except Exception as e:
-            print(f"Failed to delete Google Calendar event: {e}")
+            logger.error(f"Failed to delete Google Calendar event: {e}")
     
     db.commit()
     return True

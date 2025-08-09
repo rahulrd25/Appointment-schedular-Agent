@@ -1,54 +1,51 @@
-import base64
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import os
+from typing import Optional
+from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
-from app.core.config import settings
+from email.mime.text import MIMEText
+import base64
+import logging
 
+logger = logging.getLogger(__name__)
 
 class GmailService:
     def __init__(self, access_token: str, refresh_token: str):
-        """Initialize Gmail service with OAuth credentials."""
         self.credentials = Credentials(
             token=access_token,
             refresh_token=refresh_token,
             token_uri="https://oauth2.googleapis.com/token",
-            client_id=settings.GOOGLE_CLIENT_ID,
-            client_secret=settings.GOOGLE_CLIENT_SECRET,
-            scopes=['https://www.googleapis.com/auth/gmail.send']
+            scopes=["https://www.googleapis.com/auth/gmail.send"]
         )
         self.service = build('gmail', 'v1', credentials=self.credentials)
 
     def send_email(self, to_email: str, subject: str, html_body: str, from_name: str = None):
-        """Send email using Gmail API."""
+        """Send an email using Gmail API."""
         try:
-            # Create message
-            message = MIMEMultipart('alternative')
+            message = MIMEText(html_body, 'html')
             message['to'] = to_email
             message['subject'] = subject
             
-            # Attach HTML content
-            html_part = MIMEText(html_body, 'html')
-            message.attach(html_part)
+            if from_name:
+                message['from'] = f"{from_name} <noreply@smartcal.com>"
+            else:
+                message['from'] = "SmartCal <noreply@smartcal.com>"
             
-            # Encode message
             raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
             
-            # Send email
             sent_message = self.service.users().messages().send(
                 userId='me',
                 body={'raw': raw_message}
             ).execute()
             
-            print(f"Email sent successfully: {sent_message['id']}")
+            logger.info(f"Email sent successfully: {sent_message['id']}")
             return True
             
-        except HttpError as error:
-            print(f"Gmail API error: {error}")
+        except Exception as error:
+            logger.error(f"Gmail API error: {error}")
             return False
         except Exception as e:
-            print(f"Gmail service error: {e}")
+            logger.error(f"Gmail service error: {e}")
             return False
 
     def send_reschedule_notification(self, to_email: str, to_name: str, host_name: str, booking, old_time, reason=""):

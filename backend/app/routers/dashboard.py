@@ -1,18 +1,21 @@
-from fastapi import APIRouter, Request, Depends, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
+from datetime import datetime, timezone, timedelta
+import logging
+
 from app.core.database import get_db
-from app.services.user_service import get_user_by_email
 from app.core.security import verify_token
-from app.services.advanced_ai_agent_service import AdvancedAIAgentService
-from app.services.availability_service import get_availability_slots_for_user
+from app.services.user_service import get_user_by_email
+from app.models.models import User, AvailabilitySlot, Booking
+from app.services.availability_service import get_availability_slots_for_user, AvailabilityService
 from app.services.booking_service import get_upcoming_bookings
-from app.services.google_calendar_service import GoogleCalendarService
-import json
 from app.core.timezone_utils import TimezoneManager
-from datetime import timezone
 from zoneinfo import ZoneInfo
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -140,9 +143,9 @@ async def dashboard_data(request: Request, db: Session = Depends(get_db)):
         # Get availability slots with error handling (including booked ones)
         try:
             availability_slots = get_availability_slots_for_user(db, user.id, include_unavailable=True)
-            print(f"Successfully retrieved {len(availability_slots)} availability slots for user {user.id}")
+            logger.debug(f"Successfully retrieved {len(availability_slots)} availability slots for user {user.id}")
         except Exception as e:
-            print(f"Error getting availability slots for user {user.id}: {e}")
+            logger.error(f"Error getting availability slots for user {user.id}: {e}")
             availability_slots = []
         
         # Get user's timezone
@@ -163,9 +166,9 @@ async def dashboard_data(request: Request, db: Session = Depends(get_db)):
         # Get upcoming bookings with error handling
         try:
             upcoming_bookings = get_upcoming_bookings(db, user.id, limit=10)
-            print(f"Successfully retrieved {len(upcoming_bookings)} upcoming bookings for user {user.id}")
+            logger.debug(f"Successfully retrieved {len(upcoming_bookings)} upcoming bookings for user {user.id}")
         except Exception as e:
-            print(f"Error getting upcoming bookings for user {user.id}: {e}")
+            logger.error(f"Error getting upcoming bookings for user {user.id}: {e}")
             upcoming_bookings = []
         
         # Format data to match frontend expectations

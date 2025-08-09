@@ -1,5 +1,6 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta, timezone
+import logging
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -7,6 +8,8 @@ from sqlalchemy import and_
 from app.models.models import AvailabilitySlot, User, Booking
 from app.schemas.schemas import AvailabilitySlotCreate, AvailabilitySlotUpdate
 from app.core.timezone_utils import TimezoneManager
+
+logger = logging.getLogger(__name__)
 
 
 def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id: int) -> dict:
@@ -54,10 +57,10 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
                 
                 # Test calendar connection first
                 calendar_service.get_events()
-                print(f"✅ Calendar connection test successful for {user.email}")
+                logger.info(f"✅ Calendar connection test successful for {user.email}")
                 
             except Exception as e:
-                print(f"Calendar connection test failed: {e}")
+                logger.error(f"Calendar connection test failed: {e}")
                 return {
                     "success": False,
                     "message": "Couldn't add slot. Please reconnect your calendar in Settings.",
@@ -113,10 +116,10 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
                 db.commit()
                 
                 calendar_created = True
-                print(f"✅ Successfully synced availability slot {db_slot.id} to Google Calendar")
+                logger.info(f"✅ Successfully synced availability slot {db_slot.id} to Google Calendar")
                 
             except Exception as e:
-                print(f"Failed to create Google Calendar event: {e}")
+                logger.error(f"Failed to create Google Calendar event: {e}")
                 # Slot exists in database, calendar sync failed
                 # This is acceptable - database is source of truth
                 calendar_created = False
@@ -132,7 +135,7 @@ def create_availability_slot(db: Session, slot: AvailabilitySlotCreate, user_id:
         }
         
     except Exception as e:
-        print(f"Error creating availability slot: {e}")
+        logger.error(f"Error creating availability slot: {e}")
         import traceback
         traceback.print_exc()
         return {
@@ -258,15 +261,15 @@ def delete_availability_slot(db: Session, slot_id: int, user_id: int) -> dict:
                             user_id=user.id
                         )
                         calendar_service.delete_event(booking.google_event_id)
-                        print(f"Deleted Google Calendar event for booking {booking.id}")
+                        logger.info(f"Deleted Google Calendar event for booking {booking.id}")
                 except Exception as e:
-                    print(f"Failed to delete Google Calendar event for booking {booking.id}: {e}")
+                    logger.error(f"Failed to delete Google Calendar event for booking {booking.id}: {e}")
             
             # Delete the booking
             db.delete(booking)
             booking_deleted = True
         
-        print(f"Deleted {len(existing_bookings)} associated booking(s)")
+        logger.info(f"Deleted {len(existing_bookings)} associated booking(s)")
     
     calendar_deleted = None
     calendar_error = None
@@ -286,7 +289,7 @@ def delete_availability_slot(db: Session, slot_id: int, user_id: int) -> dict:
                 calendar_service.delete_event(slot.google_event_id)
                 calendar_deleted = True
             except Exception as e:
-                print(f"Failed to delete Google Calendar event: {e}")
+                logger.error(f"Failed to delete Google Calendar event: {e}")
                 calendar_deleted = False
                 calendar_error = str(e)
         else:

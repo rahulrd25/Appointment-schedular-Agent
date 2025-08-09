@@ -7,10 +7,13 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
+import logging
 
 from app.models.models import User
 from app.services.google_calendar_service import GoogleCalendarService
 from app.services.availability_service import AvailabilityService
+
+logger = logging.getLogger(__name__)
 
 
 class LLMCalendarService:
@@ -45,17 +48,17 @@ class LLMCalendarService:
                 # Test the connection by trying to get events
                 try:
                     test_events = self.calendar_service.get_events()
-                    print(f"Calendar service initialized successfully for {self.user.google_calendar_email}")
+                    logger.info(f"Calendar service initialized successfully for {self.user.google_calendar_email}")
                 except Exception as test_error:
-                    print(f"Calendar service initialized but test failed: {test_error}")
+                    logger.warning(f"Calendar service initialized but test failed: {test_error}")
                     # Don't set to None yet, let individual methods handle the error
                     
             else:
-                print(f"No access token available for user {self.user_id}")
+                logger.warning(f"No access token available for user {self.user_id}")
                 self.calendar_service = None
                 
         except Exception as e:
-            print(f"Failed to initialize calendar service for user {self.user_id}: {e}")
+            logger.error(f"Failed to initialize calendar service for user {self.user_id}: {e}")
             self.calendar_service = None
     
     def is_calendar_connected(self) -> bool:
@@ -134,7 +137,7 @@ class LLMCalendarService:
             return self._deduplicate_slots(all_slots)
             
         except Exception as e:
-            print(f"Error getting available slots: {e}")
+            logger.error(f"Error getting available slots: {e}")
             return []
     
     def check_availability(self, start_time: datetime, end_time: datetime) -> Dict[str, Any]:
@@ -209,7 +212,7 @@ class LLMCalendarService:
             return formatted_events
             
         except Exception as e:
-            print(f"Error getting upcoming events: {e}")
+            logger.error(f"Error getting upcoming events: {e}")
             return []
     
     def schedule_meeting(self, title: str, start_time: datetime, end_time: datetime, 

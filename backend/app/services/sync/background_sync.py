@@ -1,6 +1,5 @@
 """
-Background Sync Service - Periodic synchronization with calendar providers.
-This module handles background sync jobs to keep database and external calendars in sync.
+Background Sync Service - Handles periodic synchronization between calendar providers and database
 """
 
 import asyncio
@@ -39,23 +38,20 @@ class BackgroundSyncService:
         3. Updated bookings that need re-sync
         """
         if self.is_running:
-            print("[SYNC] Background sync service is already running")
             logger.warning("Background sync service is already running")
             return
         
         self.is_running = True
-        print("[SYNC] Starting background sync service...")
         logger.info("Starting background sync service")
         
         try:
             while self.is_running:
-                print(f"[SYNC] Starting sync cycle at {datetime.now()}")
+                logger.debug(f"Starting sync cycle at {datetime.now()}")
                 await self._perform_sync_cycle()
-                print(f"[SYNC] Waiting {self.sync_config.background_sync_interval} seconds before next cycle...")
+                logger.debug(f"Waiting {self.sync_config.background_sync_interval} seconds before next cycle...")
                 await asyncio.sleep(self.sync_config.background_sync_interval)
                 
         except Exception as e:
-            print(f"[SYNC ERROR] Background sync service failed: {str(e)}")
             logger.error(f"Background sync service failed: {str(e)}")
             self.is_running = False
     
@@ -76,7 +72,6 @@ class BackgroundSyncService:
         """
         db = None
         try:
-            print("[SYNC CYCLE] Starting sync cycle...")
             logger.debug("Starting sync cycle")
             
             # Check database connection health first
@@ -87,43 +82,43 @@ class BackgroundSyncService:
             # Get database session with proper error handling
             try:
                 db = next(get_db())
-                print("[SYNC CYCLE] Database session acquired")
+                logger.debug("Database session acquired")
             except Exception as db_error:
                 logger.error(f"Failed to acquire database session: {str(db_error)}")
                 return
             
             # Step 1: Calendar → Database sync
-            print("[SYNC CYCLE] Step 1 - Calendar to DB...")
+            logger.debug("Step 1 - Calendar to DB...")
             await self._perform_calendar_to_database_sync(db)
             
             # Step 2: Find bookings to sync to calendar
-            print("[SYNC CYCLE] Step 2 - Find bookings to sync...")
+            logger.debug("Step 2 - Find bookings to sync...")
             bookings_to_sync = self._find_bookings_needing_sync(db)
             
             if not bookings_to_sync:
-                print("[SYNC CYCLE] No bookings to sync")
+                logger.debug("No bookings to sync")
                 logger.debug("No bookings need sync to calendar in this cycle")
             else:
-                print(f"[SYNC CYCLE] Found {len(bookings_to_sync)} bookings to sync")
+                logger.info(f"Found {len(bookings_to_sync)} bookings to sync")
                 logger.info(f"Found {len(bookings_to_sync)} bookings that need sync to calendar")
                 
                 # Process each booking
                 for i, booking in enumerate(bookings_to_sync):
-                    print(f"[SYNC CYCLE] Syncing booking {i+1}/{len(bookings_to_sync)} - ID: {booking.id}")
+                    logger.debug(f"Syncing booking {i+1}/{len(bookings_to_sync)} - ID: {booking.id}")
                     await self._sync_single_booking(db, booking)
             
-            print("[SYNC CYCLE] Completed sync cycle")
+            logger.debug("Completed sync cycle")
             logger.debug("Completed sync cycle")
             
         except Exception as e:
-            print(f"[SYNC CYCLE ERROR] Failed to perform sync cycle: {str(e)}")
+            logger.error(f"Failed to perform sync cycle: {str(e)}")
             logger.error(f"Failed to perform sync cycle: {str(e)}")
         finally:
             # Ensure database session is properly closed
             if db:
                 try:
                     db.close()
-                    print("[SYNC CYCLE] Database session closed")
+                    logger.debug("Database session closed")
                 except Exception as close_error:
                     logger.warning(f"Error closing database session: {str(close_error)}")
     
@@ -187,7 +182,7 @@ class BackgroundSyncService:
                         Booking.google_event_id.is_(None)
                     ).all()
                     
-                    print(f"[SYNC] Found {len(bookings)} bookings that need sync (without calendar events)")
+                    logger.debug(f"Found {len(bookings)} bookings that need sync (without calendar events)")
                     return bookings
                     
                 except Exception as db_error:
@@ -283,13 +278,13 @@ class BackgroundSyncService:
                 if result.get('success') and result.get('result', {}).get('id'):
                     if provider_name == 'google':
                         booking.google_event_id = result['result']['id']
-                        print(f"[SYNC] Updated booking {booking.id} with Google event ID: {result['result']['id']}")
+                        logger.debug(f"Updated booking {booking.id} with Google event ID: {result['result']['id']}")
                     # Future: Handle other providers
                     break
             
             # Update the booking timestamp
             booking.updated_at = datetime.utcnow()
-            print(f"[SYNC] Updated booking {booking.id} timestamp")
+            logger.debug(f"Updated booking {booking.id} timestamp")
             
         except Exception as e:
             logger.error(f"Failed to update booking {booking.id} with sync results: {str(e)}")
@@ -383,14 +378,12 @@ class BackgroundSyncService:
         What does it do? Calendar → Database sync.
         """
         try:
-            print(f"[SYNC SERVICE] Starting calendar sync for user {user_id}")
             logger.info(f"Starting calendar to database sync for user {user_id}")
             
             # Get user
-            print(f"[SYNC SERVICE] Getting user...")
             user = db.query(User).filter(User.id == user_id).first()
             if not user or not user.google_access_token:
-                print(f"[SYNC SERVICE ERROR] User not found or calendar not connected")
+                logger.error(f"User not found or calendar not connected for user {user_id}")
                 return {
                     "success": False,
                     "error": "User not found or calendar not connected",
@@ -398,10 +391,9 @@ class BackgroundSyncService:
                     "events_updated": 0
                 }
             
-            print(f"[SYNC SERVICE] User found - {user.email}")
+            logger.info(f"User found - {user.email}")
             
             # Initialize Google Calendar service
-            print(f"[SYNC SERVICE] Initializing Google Calendar...")
             from app.services.google_calendar_service import GoogleCalendarService
             calendar_service = GoogleCalendarService(
                 access_token=user.google_access_token,
@@ -415,13 +407,12 @@ class BackgroundSyncService:
             start_date = datetime.now(timezone.utc) - timedelta(days=7)
             end_date = datetime.now(timezone.utc) + timedelta(days=7)
             
-            print(f"[SYNC SERVICE] Fetching events...")
             try:
                 calendar_events = calendar_service.get_events(start_date, end_date)
-                print(f"[SYNC SERVICE] Found {len(calendar_events)} events")
+                logger.info(f"Found {len(calendar_events)} events")
             except Exception as e:
-                print(f"[SYNC SERVICE] Failed to fetch events: {str(e)}")
-                print(f"[SYNC SERVICE] Skipping calendar sync due to error")
+                logger.error(f"Failed to fetch events: {str(e)}")
+                logger.error(f"Skipping calendar sync due to error")
                 return {
                     "success": False,
                     "error": str(e),
@@ -432,10 +423,10 @@ class BackgroundSyncService:
             events_created = 0
             events_updated = 0
             
-            print(f"[SYNC SERVICE] Processing {len(calendar_events)} events...")
+            logger.info(f"Processing {len(calendar_events)} events...")
             for i, event in enumerate(calendar_events):
                 try:
-                    print(f"[SYNC SERVICE] Processing event {i+1}/{len(calendar_events)} - {event.get('summary', 'No title')}")
+                    logger.debug(f"Processing event {i+1}/{len(calendar_events)} - {event.get('summary', 'No title')}")
                     
                     # Check if booking exists for this event
                     existing_booking = db.query(Booking).filter(
@@ -444,27 +435,26 @@ class BackgroundSyncService:
                     ).first()
                     
                     if existing_booking:
-                        print(f"[SYNC SERVICE] Found booking {existing_booking.id} for event {event.get('id')}")
+                        logger.debug(f"Found booking {existing_booking.id} for event {event.get('id')}")
                         # Update if event changed
                         if self._has_event_changed(existing_booking, event):
                             self._update_booking_from_calendar_event(existing_booking, event)
                             events_updated += 1
-                            print(f"[SYNC SERVICE] Updated booking {existing_booking.id}")
                             logger.info(f"Updated booking {existing_booking.id} from calendar event")
                         else:
-                            print(f"[SYNC SERVICE] Event unchanged")
+                            logger.debug(f"Event unchanged")
                     else:
-                        print(f"[SYNC SERVICE] Skipping event {event.get('id')} - Database-First")
+                        logger.debug(f"Skipping event {event.get('id')} - Database-First")
                 
                 except Exception as e:
-                    print(f"[SYNC SERVICE ERROR] Failed to process event {event.get('id')}: {str(e)}")
+                    logger.error(f"Failed to process event {event.get('id')}: {str(e)}")
                     logger.error(f"Failed to process calendar event {event.get('id')}: {str(e)}")
                     continue
             
-            print(f"[SYNC SERVICE] Committing changes...")
+            logger.info(f"Committing changes...")
             db.commit()
             
-            print(f"[SYNC SERVICE] Sync completed: {events_updated} updated")
+            logger.info(f"Sync completed: {events_updated} updated")
             logger.info(f"Calendar to database sync completed: {events_updated} updated (Database-First approach)")
             
             return {
@@ -475,7 +465,7 @@ class BackgroundSyncService:
             }
             
         except Exception as e:
-            print(f"[SYNC SERVICE ERROR] Failed to sync calendar to database: {str(e)}")
+            logger.error(f"Failed to sync calendar to database: {str(e)}")
             logger.error(f"Failed to sync calendar to database: {str(e)}")
             return {
                 "success": False,

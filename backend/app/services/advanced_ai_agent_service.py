@@ -11,8 +11,7 @@ from app.models.models import User, AvailabilitySlot, Booking
 from app.services import availability_service, booking_service, user_service
 from app.schemas.schemas import PublicBookingCreate
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Get logger for this module
 logger = logging.getLogger(__name__)
 
 class IntentType(Enum):

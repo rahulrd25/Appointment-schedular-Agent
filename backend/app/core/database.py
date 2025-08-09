@@ -2,19 +2,31 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
+import logging
+import os
 
 from app.core.config import settings
 
-# Configure database engine with proper connection pool settings
+logger = logging.getLogger(__name__)
+
+# Suppress SQLAlchemy logging in production or when explicitly requested
+environment = os.getenv("ENVIRONMENT", "development")
+if environment == "production" or os.getenv("SUPPRESS_SQL_LOGS", "false").lower() == "true":
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+    logging.getLogger('sqlalchemy.pool').setLevel(logging.WARNING)
+    logging.getLogger('sqlalchemy.dialects').setLevel(logging.WARNING)
+    logging.getLogger('sqlalchemy.orm').setLevel(logging.WARNING)
+
+# Configure database engine with production-ready connection pool settings
 engine = create_engine(
     settings.DATABASE_URL,
     poolclass=QueuePool,
-    pool_size=20,  # Increased from default 5
-    max_overflow=30,  # Increased from default 10
-    pool_timeout=60,  # Increased timeout
-    pool_recycle=3600,  # Recycle connections after 1 hour
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
+    pool_timeout=settings.DB_POOL_TIMEOUT,
+    pool_recycle=settings.DB_POOL_RECYCLE,
     pool_pre_ping=True,  # Verify connections before use
-    echo=False  # Set to True for SQL debugging
+    echo=False  # Disable SQL debugging in all environments
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -37,5 +49,5 @@ def check_db_connection():
         db.close()
         return True
     except Exception as e:
-        print(f"Database connection check failed: {str(e)}")
+        logger.error(f"Database connection check failed: {str(e)}")
         return False

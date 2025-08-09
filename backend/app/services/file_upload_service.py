@@ -4,7 +4,9 @@ from typing import Optional
 from fastapi import UploadFile, HTTPException
 from app.core.config import settings
 import shutil
+import logging
 
+logger = logging.getLogger(__name__)
 
 def save_uploaded_file(file: UploadFile, subdirectory: str = "") -> Optional[str]:
     """
@@ -55,7 +57,7 @@ def save_uploaded_file(file: UploadFile, subdirectory: str = "") -> Optional[str
         return relative_path
         
     except Exception as e:
-        print(f"File upload error: {e}")
+        logger.error(f"File upload error: {e}")
         return None
 
 

@@ -25,9 +25,9 @@ class IntelligentAgentService:
         self.ai_agent = AdvancedAIAgentService(db)
         self.knowledge_base = KnowledgeBaseService(db)
         
-        # Initialize LLM service with debug logging
+        # Initialize LLM service
         try:
-            self.llm_service = LLMService()  # Initialize LLM service
+            self.llm_service = LLMService()
             logger.info(f"LLM Service initialized successfully with provider: {self.llm_service.provider_name}")
         except Exception as e:
             logger.error(f"Failed to initialize LLM service: {e}")

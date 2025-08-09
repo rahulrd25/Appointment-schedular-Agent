@@ -49,7 +49,7 @@ async def login_post(
         key="access_token",
         value=f"Bearer {access_token}",
         httponly=True,
-        secure=True,
+        secure=settings.ENVIRONMENT == "production",  # Only secure in production with HTTPS
         samesite="lax",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/"
@@ -101,7 +101,7 @@ async def register_post(
         key="access_token",
         value=f"Bearer {access_token}",
         httponly=True,
-        secure=True,
+        secure=settings.ENVIRONMENT == "production",  # Only secure in production with HTTPS
         samesite="lax",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/"
