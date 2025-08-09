@@ -12,15 +12,11 @@ RUN apt-get update && apt-get install -y \
 # Install uv
 RUN pip install uv
 
-# Copy dependency files
-COPY pyproject.toml .
-COPY uv.lock .
+# Copy application code
+COPY . .
 
 # Install Python dependencies
 RUN uv sync --frozen
-
-# Copy application code
-COPY . .
 
 # Expose port
 EXPOSE 8000

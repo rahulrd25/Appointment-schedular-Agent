@@ -50,9 +50,8 @@ ehthumbs.db
 Thumbs.db
 
 # Documentation
-README.md
-*.md
-docs/
+
+
 
 # Development files
 tests/
