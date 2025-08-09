@@ -112,7 +112,7 @@ def send_guest_confirmation_email(
                     
                     <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
                         <h3 style="margin-top: 0;">📅 Booking Details</h3>
-                        <p><strong>Date & Time:</strong> {booking.start_time.strftime('%B %d, %Y at %I:%M %p')}</p>
+                        <p><strong>Date & Time:</strong> {booking.start_time.replace(tzinfo=None).strftime('%B %d, %Y at %I:%M %p') if booking.start_time.tzinfo else booking.start_time.strftime('%B %d, %Y at %I:%M %p')}</p>
                         <p><strong>Host:</strong> {host_name}</p>
                         <p><strong>Booking ID:</strong> #{booking.id}</p>
                     </div>

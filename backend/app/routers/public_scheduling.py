@@ -18,7 +18,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/{scheduling_slug}", response_class=HTMLResponse)
-async def get_public_booking_page(
+async def get_public_scheduling_page(
     request: Request,
     scheduling_slug: str,
     db: Session = Depends(get_db),
@@ -29,7 +29,7 @@ async def get_public_booking_page(
         raise HTTPException(status_code=404, detail="User not found")
 
     return templates.TemplateResponse(
-        "public_booking_all_in_one.html", {
+        "public_scheduling_page.html", {
             "request": request, 
             "user": user
         }
@@ -84,7 +84,7 @@ async def get_user_availability(
 
 
 @router.post("/{scheduling_slug}/book")
-async def create_public_booking(
+async def create_public_scheduling(
     scheduling_slug: str,
     guest_name: str = Form(...),
     guest_email: str = Form(...),
@@ -132,6 +132,16 @@ async def create_public_booking(
         if not matching_slot:
             raise HTTPException(status_code=400, detail="Selected time slot is not available")
         
+        # Get the actual availability slot from database
+        slot_id = matching_slot.get('id')
+        if not slot_id:
+            raise HTTPException(status_code=400, detail="Invalid slot data")
+        
+        # Verify the slot is still available
+        from app.services.availability_service import check_slot_availability
+        if not check_slot_availability(db, slot_id):
+            raise HTTPException(status_code=400, detail="Selected time slot is no longer available")
+        
         # Create booking data
         booking_data = PublicBookingCreate(
             guest_name=guest_name,
@@ -140,7 +150,7 @@ async def create_public_booking(
         )
         
         # Create the booking
-        booking = create_booking(db, booking_data, matching_slot['id'], user)
+        booking = create_booking(db, booking_data, slot_id, user)
         
         if not booking:
             raise HTTPException(status_code=400, detail="Unable to create booking. Slot may no longer be available.")

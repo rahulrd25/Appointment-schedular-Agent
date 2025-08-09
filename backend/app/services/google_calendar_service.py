@@ -7,20 +7,24 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
+from app.core.calendar_architecture import BaseCalendarProvider, CalendarProviderType
+from app.core.config import settings
 
-class GoogleCalendarService:
+
+class GoogleCalendarService(BaseCalendarProvider):
     def __init__(self, access_token: str = None, refresh_token: str = None, db: Optional[Any] = None, user_id: Optional[int] = None):
+        # Call parent constructor
+        super().__init__(access_token=access_token, refresh_token=refresh_token, db=db, user_id=user_id)
+        
         self.credentials = None
-        self.db = db
-        self.user_id = user_id
         
         if access_token and refresh_token:
             self.credentials = Credentials(
                 token=access_token,
                 refresh_token=refresh_token,
                 token_uri="https://oauth2.googleapis.com/token",
-                client_id=os.getenv("GOOGLE_CLIENT_ID"),
-                client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+                client_id=settings.GOOGLE_CLIENT_ID,
+                client_secret=settings.GOOGLE_CLIENT_SECRET,
                 scopes=[
                     "https://www.googleapis.com/auth/calendar",
                     "https://www.googleapis.com/auth/calendar.events",
@@ -29,14 +33,29 @@ class GoogleCalendarService:
             )
 
     def get_authorization_url(self):
-        flow = InstalledAppFlow.from_client_secrets_file(
-            'client_secret.json', [
+        # Use environment variables instead of client_secret.json
+        if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+            raise Exception("Google OAuth credentials not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.")
+        
+        # Create flow using environment variables
+        flow = InstalledAppFlow.from_client_config(
+            {
+                "installed": {
+                    "client_id": settings.GOOGLE_CLIENT_ID,
+                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                    "redirect_uris": [settings.GOOGLE_REDIRECT_URI]
+                }
+            },
+            [
                 "https://www.googleapis.com/auth/calendar",
                 "https://www.googleapis.com/auth/calendar.events",
                 "https://www.googleapis.com/auth/calendar.readonly"
             ]
         )
-        flow.redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
+        flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
         authorization_url, state = flow.authorization_url(
             access_type='offline',
             include_granted_scopes='true',
@@ -45,14 +64,29 @@ class GoogleCalendarService:
         return authorization_url, state
 
     def get_tokens_from_auth_code(self, auth_code: str):
-        flow = InstalledAppFlow.from_client_secrets_file(
-            'client_secret.json', [
+        # Use environment variables instead of client_secret.json
+        if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+            raise Exception("Google OAuth credentials not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.")
+        
+        # Create flow using environment variables
+        flow = InstalledAppFlow.from_client_config(
+            {
+                "installed": {
+                    "client_id": settings.GOOGLE_CLIENT_ID,
+                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                    "redirect_uris": [settings.GOOGLE_REDIRECT_URI]
+                }
+            },
+            [
                 "https://www.googleapis.com/auth/calendar",
                 "https://www.googleapis.com/auth/calendar.events",
                 "https://www.googleapis.com/auth/calendar.readonly"
             ]
         )
-        flow.redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
+        flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
         flow.fetch_token(code=auth_code)
         self.credentials = flow.credentials
         return {
@@ -87,8 +121,8 @@ class GoogleCalendarService:
                 token=result["access_token"],
                 refresh_token=result["refresh_token"],
                 token_uri="https://oauth2.googleapis.com/token",
-                client_id=os.getenv("GOOGLE_CLIENT_ID"),
-                client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+                client_id=settings.GOOGLE_CLIENT_ID,
+                client_secret=settings.GOOGLE_CLIENT_SECRET,
                 scopes=[
                     "https://www.googleapis.com/auth/calendar",
                     "https://www.googleapis.com/auth/calendar.events",

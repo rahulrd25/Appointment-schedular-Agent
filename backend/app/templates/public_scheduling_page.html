@@ -421,12 +421,6 @@
 
     <!-- Right Panel -->
     <div class="right-panel">
-        <!-- Vue.js Test -->
-        <!-- <div style="background: #f0f0f0; padding: 10px; margin-bottom: 20px; border: 1px solid #ccc;">
-            <strong>Debug:</strong> Step: <span v-text="step"></span> | 
-            Month: <span v-text="currentMonthText"></span> |
-            Calendar Days: <span v-text="calendarDays.length"></span>
-        </div> -->
         <!-- Step 1: Date Selection -->
         <div v-show="step === 1">
             <div class="step-header">
@@ -832,7 +826,6 @@ createApp({
                 });
                 if (response.ok) {
                     const result = await response.json();
-                    console.log('Booking success response:', result);
                     this.bookingResult = result;
                     
                     // Check if booking was successful

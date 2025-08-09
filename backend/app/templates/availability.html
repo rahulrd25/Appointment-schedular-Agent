@@ -1236,18 +1236,16 @@ function deleteIndividualSlot(slotId, buttonElement, event) {
         event.stopImmediatePropagation();
     }
     
-
-    
-
-    
-    // Show loading spinner
-    const spinner = buttonElement.querySelector('#delete-indicator-' + slotId);
-    const icon = buttonElement.querySelector('svg:not(.animate-spin)');
-    spinner.classList.remove('hidden');
-    icon.classList.add('hidden');
-    
-    // Disable button
+    // Disable button to prevent double-clicking
     buttonElement.disabled = true;
+    
+    // Show loading state by changing the button text/icon
+    const originalHTML = buttonElement.innerHTML;
+    buttonElement.innerHTML = `
+        <svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+    `;
     
     // Make DELETE request
     fetch('/api/v1/availability/' + slotId, {
@@ -1255,6 +1253,7 @@ function deleteIndividualSlot(slotId, buttonElement, event) {
         headers: {
             'Content-Type': 'application/json',
         },
+        credentials: 'include', // Include cookies for authentication
     })
     .then(response => {
         if (!response.ok) {
@@ -1265,20 +1264,21 @@ function deleteIndividualSlot(slotId, buttonElement, event) {
     .then(data => {
         // Check if database deletion was successful
         if (data.success) {
-            // Hide spinner and show icon
-            spinner.classList.add('hidden');
-            icon.classList.remove('hidden');
-            
             // Show success message
             const successDiv = document.createElement('div');
             successDiv.className = 'fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center space-x-2';
-            let message = 'Slot deleted successfully from app';
+            let message = data.message || 'Slot deleted successfully';
+            
+            // Add calendar deletion info
             if (data.calendar_deleted === true) {
-                message += ' and Google Calendar!';
+                message += ' (Google Calendar event also deleted)';
             } else if (data.calendar_deleted === false) {
-                message += ' but failed to delete from Google Calendar.';
-            } else {
-                message += ' (no Google Calendar event associated).';
+                message += ' (Google Calendar event deletion failed)';
+            }
+            
+            // Add booking deletion info
+            if (data.bookings_deleted && data.bookings_deleted > 0) {
+                message += ` - ${data.bookings_deleted} associated booking(s) also deleted`;
             }
             
             successDiv.innerHTML = `
@@ -1286,7 +1286,7 @@ function deleteIndividualSlot(slotId, buttonElement, event) {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>
                 <span class="font-medium">${message}</span>
-            `
+            `;
             document.body.appendChild(successDiv);
             
             // Remove message after 3 seconds
@@ -1300,18 +1300,12 @@ function deleteIndividualSlot(slotId, buttonElement, event) {
                 slotDiv.remove();
             }
             
-            // Update slot count in header
+            // Update slot count in header if it exists
             const slotCountElement = document.querySelector('p.text-sm.text-gray-500');
             if (slotCountElement) {
                 const currentCount = parseInt(slotCountElement.textContent.match(/\d+/)[0]);
                 const newCount = Math.max(0, currentCount - 1);
                 slotCountElement.textContent = `${newCount} time slots`;
-            }
-            
-            // Update Vue.js component state
-            const app = document.querySelector('#availability-app').__vue_app;
-            if (app && app._instance && app._instance.proxy) {
-                app._instance.proxy.updateSelectedCount();
             }
         } else {
             // Show failure message
@@ -1333,16 +1327,13 @@ function deleteIndividualSlot(slotId, buttonElement, event) {
                 messageDiv.remove();
             }, 5000);
             
-            // Re-enable button
+            // Re-enable button and restore original content
             buttonElement.disabled = false;
+            buttonElement.innerHTML = originalHTML;
         }
     })
     .catch(error => {
         console.error('Error deleting slot:', error);
-        
-        // Hide spinner and show icon
-        spinner.classList.add('hidden');
-        icon.classList.remove('hidden');
         
         // Show error message
         const errorDiv = document.createElement('div');
@@ -1360,8 +1351,9 @@ function deleteIndividualSlot(slotId, buttonElement, event) {
             errorDiv.remove();
         }, 3000);
         
-        // Re-enable button
+        // Re-enable button and restore original content
         buttonElement.disabled = false;
+        buttonElement.innerHTML = originalHTML;
     });
 }
 
@@ -1882,8 +1874,22 @@ function applyQuickAvailability() {
     })
     .then(data => {
         if (data.success) {
-            showNotification(`Successfully created ${data.slots_created} availability slots!`, 'success');
-            // Reload page to show new slots
+            let message = data.message;
+            let notificationType = 'success';
+            
+            if (data.existing_slots && data.existing_slots.length > 0) {
+                if (data.slots_created > 0) {
+                    message = `Successfully created ${data.slots_created} new slots. ${data.existing_slots.length} slots already exist.`;
+                    notificationType = 'success';
+                } else {
+                    message = `${data.existing_slots.length} slots already exist for the selected times.`;
+                    notificationType = 'warning';
+                }
+            }
+            
+            showNotification(message, notificationType);
+            
+            // Reload page to show new slots and existing slots
             setTimeout(() => {
                 location.reload();
             }, 1500);

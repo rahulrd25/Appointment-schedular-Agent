@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.database import get_db, check_db_connection
 from app.models.models import Booking, User
 from app.core.calendar_architecture import CalendarSyncService, create_calendar_provider, CalendarProviderType
 from app.core.sync_config import get_sync_config
@@ -74,13 +74,23 @@ class BackgroundSyncService:
         3. Attempts to sync them to calendar providers
         4. Updates sync status and metadata
         """
+        db = None
         try:
             print("[SYNC CYCLE] Starting sync cycle...")
             logger.debug("Starting sync cycle")
             
-            # Get database session
-            db = next(get_db())
-            print("[SYNC CYCLE] Database session acquired")
+            # Check database connection health first
+            if not check_db_connection():
+                logger.error("Database connection is unhealthy, skipping sync cycle")
+                return
+            
+            # Get database session with proper error handling
+            try:
+                db = next(get_db())
+                print("[SYNC CYCLE] Database session acquired")
+            except Exception as db_error:
+                logger.error(f"Failed to acquire database session: {str(db_error)}")
+                return
             
             # Step 1: Calendar → Database sync
             print("[SYNC CYCLE] Step 1 - Calendar to DB...")
@@ -108,6 +118,14 @@ class BackgroundSyncService:
         except Exception as e:
             print(f"[SYNC CYCLE ERROR] Failed to perform sync cycle: {str(e)}")
             logger.error(f"Failed to perform sync cycle: {str(e)}")
+        finally:
+            # Ensure database session is properly closed
+            if db:
+                try:
+                    db.close()
+                    print("[SYNC CYCLE] Database session closed")
+                except Exception as close_error:
+                    logger.warning(f"Error closing database session: {str(close_error)}")
     
     async def _perform_calendar_to_database_sync(self, db: Session) -> None:
         """
@@ -155,17 +173,32 @@ class BackgroundSyncService:
             List of bookings that need sync
         """
         try:
-            # Use existing schema: find bookings without google_event_id or recently updated
-            recent_cutoff = datetime.utcnow() - timedelta(hours=1)
+            # Only find bookings without google_event_id (not synced to Google Calendar)
+            # Don't try to update existing calendar events to avoid duplicates
             
-            bookings = db.query(Booking).filter(
-                (Booking.google_event_id.is_(None)) |
-                ((Booking.updated_at > recent_cutoff) & (Booking.google_event_id.isnot(None)))
-            ).all()
+            # Add timeout and retry logic
+            import time
+            max_retries = 3
+            retry_delay = 2
             
-            print(f"[SYNC] Found {len(bookings)} bookings that need sync")
-            return bookings
-            
+            for attempt in range(max_retries):
+                try:
+                    bookings = db.query(Booking).filter(
+                        Booking.google_event_id.is_(None)
+                    ).all()
+                    
+                    print(f"[SYNC] Found {len(bookings)} bookings that need sync (without calendar events)")
+                    return bookings
+                    
+                except Exception as db_error:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Database query attempt {attempt + 1} failed: {str(db_error)}. Retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                        continue
+                    else:
+                        raise db_error
+                        
         except Exception as e:
             logger.error(f"Failed to find bookings needing sync: {str(e)}")
             return []
@@ -216,14 +249,15 @@ class BackgroundSyncService:
                 }
             }
             
-            # Sync to providers
+            # Sync to providers - create events for bookings without google_event_id
+            # Database is source of truth, calendar is derived
             sync_results = sync_service.sync_event_to_providers(
                 str(booking.id),
                 event_sync_data,
-                "create" if not booking.google_event_id else "update"
+                "create"  # Always create since we only sync bookings without google_event_id
             )
             
-            # Update booking with sync results
+            # Update database with sync results (calendar event ID)
             self._update_booking_with_sync_results(booking, sync_results)
             
             logger.info(f"Successfully synced booking {booking.id} in background")
