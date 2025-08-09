@@ -10,6 +10,9 @@ from app.services.availability_service import get_availability_slots_for_user
 from app.services.booking_service import get_upcoming_bookings
 from app.services.google_calendar_service import GoogleCalendarService
 import json
+from app.core.timezone_utils import TimezoneManager
+from datetime import timezone
+from zoneinfo import ZoneInfo
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -44,8 +47,23 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         if not user:
             return RedirectResponse(url="/", status_code=302)
 
-        # Get user's availability slots
-        availability_slots = get_availability_slots_for_user(db, user.id)
+        # Get user's availability slots (including booked ones)
+        availability_slots = get_availability_slots_for_user(db, user.id, include_unavailable=True)
+        
+        # Get user's timezone
+        user_timezone = TimezoneManager.get_user_timezone(user.timezone)
+
+        # Convert times to user's timezone for display
+        for slot in availability_slots:
+            # Ensure times are timezone-aware
+            if slot.start_time.tzinfo is None:
+                slot.start_time = slot.start_time.replace(tzinfo=timezone.utc)
+            if slot.end_time.tzinfo is None:
+                slot.end_time = slot.end_time.replace(tzinfo=timezone.utc)
+            
+            # Convert to user's timezone
+            slot.start_time = slot.start_time.astimezone(ZoneInfo(user_timezone))
+            slot.end_time = slot.end_time.astimezone(ZoneInfo(user_timezone))
         
         # Get upcoming bookings
         upcoming_bookings = get_upcoming_bookings(db, user.id, limit=5)
@@ -119,39 +137,86 @@ async def dashboard_data(request: Request, db: Session = Depends(get_db)):
         if not user:
             return {"error": "User not found"}
         
-        # Get availability slots
+        # Get availability slots with error handling (including booked ones)
         try:
-            availability_slots = get_availability_slots_for_user(db, user.id)
+            availability_slots = get_availability_slots_for_user(db, user.id, include_unavailable=True)
+            print(f"Successfully retrieved {len(availability_slots)} availability slots for user {user.id}")
         except Exception as e:
-            print(f"Error getting availability slots: {e}")
+            print(f"Error getting availability slots for user {user.id}: {e}")
             availability_slots = []
         
-        # Get upcoming bookings
+        # Get user's timezone
+        user_timezone = TimezoneManager.get_user_timezone(user.timezone)
+        
+        # Convert times to user's timezone for display
+        for slot in availability_slots:
+            # Ensure times are timezone-aware
+            if slot.start_time.tzinfo is None:
+                slot.start_time = slot.start_time.replace(tzinfo=timezone.utc)
+            if slot.end_time.tzinfo is None:
+                slot.end_time = slot.end_time.replace(tzinfo=timezone.utc)
+            
+            # Convert to user's timezone
+            slot.start_time = slot.start_time.astimezone(ZoneInfo(user_timezone))
+            slot.end_time = slot.end_time.astimezone(ZoneInfo(user_timezone))
+        
+        # Get upcoming bookings with error handling
         try:
             upcoming_bookings = get_upcoming_bookings(db, user.id, limit=10)
+            print(f"Successfully retrieved {len(upcoming_bookings)} upcoming bookings for user {user.id}")
         except Exception as e:
-            print(f"Error getting upcoming bookings: {e}")
+            print(f"Error getting upcoming bookings for user {user.id}: {e}")
             upcoming_bookings = []
         
+        # Format data to match frontend expectations
+        formatted_bookings = []
+        for booking in upcoming_bookings:
+            # Ensure times are timezone-aware
+            if booking.start_time.tzinfo is None:
+                booking.start_time = booking.start_time.replace(tzinfo=timezone.utc)
+            if booking.end_time.tzinfo is None:
+                booking.end_time = booking.end_time.replace(tzinfo=timezone.utc)
+            
+            # Convert to user's timezone
+            booking_start_time = booking.start_time.astimezone(ZoneInfo(user_timezone))
+            booking_end_time = booking.end_time.astimezone(ZoneInfo(user_timezone))
+            
+            # Format date and time for display
+            start_date = booking_start_time.strftime('%Y-%m-%d')
+            start_time = booking_start_time.strftime('%H:%M')
+            
+            formatted_bookings.append({
+                "id": booking.id,
+                "title": f"Meeting with {booking.guest_name}",
+                "date": start_date,
+                "time": start_time,
+                "email": booking.guest_email,
+                "location": None,  # Add location if available in future
+                "description": booking.guest_message,
+                "status": booking.status,
+                "source": "booking"  # Distinguish from calendar events
+            })
+        
+        # Format availability slots
+        formatted_slots = []
+        for slot in availability_slots:
+            formatted_slots.append({
+                "id": slot.id,
+                "start_time": slot.start_time.isoformat(),
+                "end_time": slot.end_time.isoformat(),
+                "is_available": slot.is_available,
+                "date": slot.start_time.strftime('%Y-%m-%d'),
+                "start_time_formatted": slot.start_time.strftime('%H:%M'),
+                "end_time_formatted": slot.end_time.strftime('%H:%M')
+            })
+        
         return {
-            "availability_slots": [
-                {
-                    "id": slot.id,
-                    "start_time": slot.start_time.isoformat(),
-                    "end_time": slot.end_time.isoformat(),
-                    "is_available": slot.is_available
-                } for slot in availability_slots
-            ],
-            "upcoming_bookings": [
-                {
-                    "id": booking.id,
-                    "guest_name": booking.guest_name,
-                    "guest_email": booking.guest_email,
-                    "start_time": booking.start_time.isoformat(),
-                    "end_time": booking.end_time.isoformat(),
-                    "status": booking.status
-                } for booking in upcoming_bookings
-            ]
+            "availability_slots": formatted_slots,
+            "upcoming_bookings": formatted_bookings,
+            "upcomingCount": len(formatted_bookings),
+            "totalBookings": len(formatted_bookings),
+            "availableCount": len(formatted_slots),
+            "calendarConnected": user.google_calendar_connected
         }
     except Exception as e:
         return {"error": str(e)}
@@ -185,10 +250,10 @@ async def dashboard_chat(request: Request, db: Session = Depends(get_db)):
         message = data.get("message", "")
         
         # Initialize AI agent service
-        agent_service = AdvancedAIAgentService(db, user.id)
+        agent_service = AdvancedAIAgentService(db)
         
         # Process message
-        response = await agent_service.process_message(message, user.id)
+        response = agent_service.process_message(user.id, message)
         
         return response
     except Exception as e:
@@ -261,8 +326,14 @@ async def dashboard_availability_quick(request: Request, db: Session = Depends(g
         data = json.loads(body)
         
         # Handle quick availability setup
-        from app.services.availability_service import create_availability_slot
-        result = create_availability_slot(db, user.id, data)
+        from app.services.availability_service import create_availability_slots_bulk
+        
+        # Extract slots from the request data
+        slots_data = data.get('slots', [])
+        if not slots_data:
+            return {"success": False, "message": "No slots provided"}
+        
+        result = create_availability_slots_bulk(db, user.id, slots_data)
         
         return result
     except Exception as e:

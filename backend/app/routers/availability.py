@@ -6,6 +6,9 @@ from app.core.database import get_db
 from app.services.user_service import get_user_by_email
 from app.core.security import verify_token
 from app.services.availability_service import get_availability_slots_for_user
+from app.core.timezone_utils import TimezoneManager
+from datetime import timezone
+from zoneinfo import ZoneInfo
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -33,8 +36,23 @@ async def availability_page(request: Request, db: Session = Depends(get_db)):
         if not user:
             return RedirectResponse(url="/", status_code=302)
 
-        # Get user's availability slots
-        availability_slots = get_availability_slots_for_user(db, user.id)
+        # Get user's availability slots (including booked ones)
+        availability_slots = get_availability_slots_for_user(db, user.id, include_unavailable=True)
+
+        # Get user's timezone
+        user_timezone = TimezoneManager.get_user_timezone(user.timezone)
+
+        # Convert times to user's timezone for display
+        for slot in availability_slots:
+            # Ensure times are timezone-aware
+            if slot.start_time.tzinfo is None:
+                slot.start_time = slot.start_time.replace(tzinfo=timezone.utc)
+            if slot.end_time.tzinfo is None:
+                slot.end_time = slot.end_time.replace(tzinfo=timezone.utc)
+            
+            # Convert to user's timezone
+            slot.start_time = slot.start_time.astimezone(ZoneInfo(user_timezone))
+            slot.end_time = slot.end_time.astimezone(ZoneInfo(user_timezone))
 
         return templates.TemplateResponse("availability.html", {
             "request": request,
