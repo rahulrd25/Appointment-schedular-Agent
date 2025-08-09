@@ -44,6 +44,11 @@ app.add_middleware(
 
 # Static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+# Ensure the uploads directory exists
+from pathlib import Path
+Path("uploads").mkdir(exist_ok=True)
+
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Include API router
